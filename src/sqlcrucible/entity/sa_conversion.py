@@ -1,0 +1,85 @@
+from sqlcrucible.utils.types.equivalence import (
+    types_are_non_parameterised_and_equal,
+    strip_wrappers,
+)
+from typing import Any, TYPE_CHECKING
+
+
+from sqlcrucible.conversion.registry import Converter, ConverterFactory
+from sqlcrucible.conversion.registry import ConverterRegistry
+from typing import TypeVar
+
+if TYPE_CHECKING:
+    from sqlcrucible.entity.core import SQLCrucibleEntity
+
+_E = TypeVar("_E", bound="SQLCrucibleEntity")
+
+
+class ToSAModelConverter(Converter[_E, Any]):
+    def __init__(self, sqlcrucible_entity: type[_E]):
+        self._sqlcrucible_entity = sqlcrucible_entity
+
+    def matches(self, source_tp: type[_E], target_tp: Any) -> bool:
+        source_matches_my_entity = types_are_non_parameterised_and_equal(
+            source_tp, self._sqlcrucible_entity
+        )
+        target_matches_source_sa_type = types_are_non_parameterised_and_equal(
+            source_tp.__sqlalchemy_type__, target_tp
+        )
+        return source_matches_my_entity and target_matches_source_sa_type
+
+    def convert(self, source: _E) -> Any:
+        return source.to_sa_model()
+
+
+class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
+    def matches(self, source_tp: Any, target_tp: Any) -> bool:
+        from sqlcrucible.entity.core import SQLCrucibleEntity
+
+        stripped_source = strip_wrappers(source_tp)
+        if not isinstance(stripped_source, type):
+            return False
+
+        return issubclass(
+            stripped_source, SQLCrucibleEntity
+        ) and types_are_non_parameterised_and_equal(source_tp.__sqlalchemy_type__, target_tp)
+
+    def converter(
+        self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
+    ) -> Converter[Any, Any] | None:
+        return ToSAModelConverter(strip_wrappers(source_tp))
+
+
+class FromSAModelConverter(Converter[_E, Any]):
+    def __init__(self, sqlcrucible_entity: type[_E]):
+        self._sqlcrucible_entity = sqlcrucible_entity
+
+    def matches(self, source_tp: type[_E], target_tp: Any) -> bool:
+        target_matches_my_entity = types_are_non_parameterised_and_equal(
+            target_tp, self._sqlcrucible_entity
+        )
+        source_matches_target_sa_type = types_are_non_parameterised_and_equal(
+            target_tp.__sqlalchemy_type__, source_tp
+        )
+        return target_matches_my_entity and source_matches_target_sa_type
+
+    def convert(self, source: _E) -> Any:
+        return self._sqlcrucible_entity.from_sa_model(source)
+
+
+class FromSAModelConverterFactory(ConverterFactory[Any, Any]):
+    def matches(self, source_tp: Any, target_tp: Any) -> bool:
+        from sqlcrucible.entity.core import SQLCrucibleEntity
+
+        stripped_target = strip_wrappers(target_tp)
+        if not isinstance(stripped_target, type):
+            return False
+
+        return issubclass(
+            stripped_target, SQLCrucibleEntity
+        ) and types_are_non_parameterised_and_equal(target_tp.__sqlalchemy_type__, source_tp)
+
+    def converter(
+        self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
+    ) -> Converter[Any, Any] | None:
+        return FromSAModelConverter(strip_wrappers(target_tp))

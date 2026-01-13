@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Auto-generated version file
+src/sqlcrucible/_version.py
+
+# Virtual environments
+.venv
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# Nox
+.nox/
+.claude

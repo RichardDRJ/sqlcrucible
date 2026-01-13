@@ -1,0 +1,83 @@
+[project]
+name = "sqlcrucible"
+dynamic = ["version"]
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Richard Rae-Jones", email = "sqlcrucible@richard.rdrj.uk" }
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "pydantic ~= 2.10",
+    "sqlalchemy ~= 2.0",
+    "typing-extensions ~= 4.15",
+]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.1-dev0"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/sqlcrucible/_version.py"
+
+[dependency-groups]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "pyright",
+    "ty",
+]
+typecheck = [
+    "pyright",
+    "ty",
+]
+lint = [
+    "ruff",
+]
+depcheck = [
+    "deptry",
+]
+dev = [
+    "nox>=2024.4.15",
+    { include-group = "test" },
+    { include-group = "typecheck" },
+    { include-group = "lint" },
+    { include-group = "depcheck" },
+]
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+testpaths = ["src", "tests"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+]
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["_version.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "FBT", "B", "C4", "A"]
+
+[tool.ruff.format]
+docstring-code-format = true
