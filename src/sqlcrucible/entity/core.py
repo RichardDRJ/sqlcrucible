@@ -55,7 +55,7 @@ class SQLAlchemyBase(DeclarativeBase):
     pass
 
 
-class SQLAlchemyParameters(TypedDict, closed=False, total=False):
+class SQLAlchemyParameters(TypedDict, extra_items=Any, total=False):
     """Type definition for SQLAlchemy configuration parameters.
 
     These can be set on entity classes to configure the generated
