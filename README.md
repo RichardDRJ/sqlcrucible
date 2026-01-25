@@ -591,4 +591,6 @@ Choose SQLCrucible if you want full SQLAlchemy compatibility and pure Pydantic m
 
 ---
 
-Made with haggis 🏴󠁧󠁢󠁳󠁣󠁴󠁿
+<p align="center">
+  🏴󠁧󠁢󠁳󠁣󠁴󠁿 Made with haggis
+</p>
