@@ -19,6 +19,7 @@ from sqlalchemy import MetaData, ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.core import SQLCrucibleEntity, SQLCrucibleBaseModel
+from sqlcrucible.entity.sa_type import SAType
 
 
 class BaseTestEntity(SQLCrucibleBaseModel):
@@ -70,7 +71,7 @@ def test_to_sa_model():
 
 def test_from_sa_model():
     """Pydantic entity creates from SQLAlchemy model."""
-    sa_model = Artist.__sqlalchemy_type__(id=uuid4(), name="Pink Floyd")
+    sa_model = SAType[Artist](id=uuid4(), name="Pink Floyd")
     artist = Artist.from_sa_model(sa_model)
 
     assert artist.id == sa_model.id

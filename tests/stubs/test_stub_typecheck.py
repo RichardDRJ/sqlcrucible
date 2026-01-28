@@ -142,3 +142,76 @@ def test_excluded_field_not_on_sa_model(checker, stub_dir):
     returncode, output = run_typechecker(checker, code, stub_dir)
     assert returncode != 0, f"{checker} should have failed for excluded field access"
     assert "pydantic_only_field" in output
+
+
+# =============================================================================
+# Relationship stub tests
+# =============================================================================
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_many_to_one_relationship_type(checker, stub_dir):
+    """Many-to-one relationship field has correct scalar type."""
+    code = dedent("""\
+    from typing import assert_type, TypeVar
+    from tests.stubs.sample_models import StubBook
+    from sqlcrucible.generated.tests.stubs.sample_models import StubAuthorAutoModel
+
+    T = TypeVar("T")
+    def cast_to(cls: type[T], obj: object) -> T:
+        return obj  # type: ignore
+
+    book_sa = cast_to(StubBook.__sqlalchemy_type__, object())
+
+    # author should be the StubAuthor SA type (scalar, not list)
+    assert_type(book_sa.author, StubAuthorAutoModel)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_one_to_many_relationship_type(checker, stub_dir):
+    """One-to-many relationship field has correct list type."""
+    code = dedent("""\
+    from typing import assert_type, TypeVar
+    from tests.stubs.sample_models import StubAuthor
+    from sqlcrucible.generated.tests.stubs.sample_models import StubBookAutoModel
+
+    T = TypeVar("T")
+    def cast_to(cls: type[T], obj: object) -> T:
+        return obj  # type: ignore
+
+    author_sa = cast_to(StubAuthor.__sqlalchemy_type__, object())
+
+    # books should be a list of StubBook SA types
+    assert_type(author_sa.books, list[StubBookAutoModel])
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_relationship_fields_accessible(checker, stub_dir):
+    """Relationship fields are accessible on SA models."""
+    code = dedent("""\
+    from typing import TypeVar, reveal_type
+    from tests.stubs.sample_models import StubAuthor, StubBook
+
+    T = TypeVar("T")
+    def cast_to(cls: type[T], obj: object) -> T:
+        return obj  # type: ignore
+
+    author_sa = cast_to(StubAuthor.__sqlalchemy_type__, object())
+    book_sa = cast_to(StubBook.__sqlalchemy_type__, object())
+
+    # Both relationship fields should be accessible
+    reveal_type(author_sa.books)
+    reveal_type(book_sa.author)
+
+    # Regular fields should still work
+    reveal_type(author_sa.name)
+    reveal_type(book_sa.title)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
