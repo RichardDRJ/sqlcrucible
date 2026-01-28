@@ -7,6 +7,7 @@ from sqlalchemy import MetaData, String
 from sqlalchemy.orm import mapped_column
 
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
+from sqlcrucible.entity.sa_type import SAType
 
 
 class BaseTestEntity(SQLCrucibleBaseModel):
@@ -66,7 +67,7 @@ def test_cat_to_sa_model():
 
 def test_dog_from_sa_model():
     """Dog entity creates from SQLAlchemy model."""
-    sa_model = Dog.__sqlalchemy_type__(id=uuid4(), type="dog", name="Rex", bones_chewed=100)
+    sa_model = SAType[Dog](id=uuid4(), type="dog", name="Rex", bones_chewed=100)
     dog = Dog.from_sa_model(sa_model)
 
     assert dog.id == sa_model.id
@@ -77,7 +78,7 @@ def test_dog_from_sa_model():
 
 def test_cat_from_sa_model():
     """Cat entity creates from SQLAlchemy model."""
-    sa_model = Cat.__sqlalchemy_type__(id=uuid4(), type="cat", name="Mittens", hours_napped=20)
+    sa_model = SAType[Cat](id=uuid4(), type="cat", name="Mittens", hours_napped=20)
     cat = Cat.from_sa_model(sa_model)
 
     assert cat.id == sa_model.id

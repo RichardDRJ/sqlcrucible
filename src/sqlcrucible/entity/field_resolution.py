@@ -25,6 +25,7 @@ from sqlalchemy.orm import (
 from typing_extensions import get_annotations, Format, evaluate_forward_ref
 
 from sqlcrucible.conversion.registry import Converter
+from sqlcrucible.utils.types.equivalence import strip_wrappers
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
@@ -84,7 +85,9 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
 
     annotations = get_annotations(sqlalchemy_type, eval_str=True, format=Format.VALUE)
     if (annotation := annotations.get(field_def.mapped_name)) is not None:
-        return _recursively_evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
+        evaluated = _recursively_evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
+        # Strip Mapped[] wrapper since converters work with the inner type
+        return strip_wrappers(evaluated)
 
     attrs = inspect(sqlalchemy_type).attrs
     prop = attrs.get(field_def.mapped_name)
@@ -92,7 +95,11 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
         case ColumnProperty():
             return prop.columns[0].type.python_type
         case RelationshipProperty():
-            return prop.entity.class_
+            entity_class = prop.entity.class_
+            # For collection relationships (one-to-many, many-to-many), wrap in list
+            if prop.uselist:
+                return list[entity_class]
+            return entity_class
         case CompositeProperty():
             return prop.composite_class
         case _:
@@ -106,6 +113,11 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
 
 
 def _recursively_evaluate_forward_refs(tp: Any, owner: type[object]) -> Any:
+    # Handle string forward references (e.g., "Profile" or "Profile.__sqlalchemy_type__")
+    if isinstance(tp, str):
+        forward_ref = ForwardRef(tp)
+        return evaluate_forward_ref(forward_ref, owner=owner)
+
     if isinstance(tp, ForwardRef):
         return evaluate_forward_ref(tp, owner=owner)
 
