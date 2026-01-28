@@ -18,6 +18,7 @@ from sqlalchemy import MetaData, ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.core import SQLCrucibleEntity
+from sqlcrucible.entity.sa_type import SAType
 
 
 metadata = MetaData()
@@ -86,7 +87,7 @@ def test_to_sa_model_uses_defined_converters() -> None:
 
 
 def test_from_sa_model_maps_fields() -> None:
-    sa_artist = Artist.__sqlalchemy_type__(id=uuid4(), name="My Chemical Romance")
+    sa_artist = SAType[Artist](id=uuid4(), name="My Chemical Romance")
 
     artist = Artist.from_sa_model(sa_artist)
 
@@ -95,7 +96,7 @@ def test_from_sa_model_maps_fields() -> None:
 
 
 def test_from_sa_model_uses_defined_converters() -> None:
-    sa_track = Track.__sqlalchemy_type__(
+    sa_track = SAType[Track](
         id=uuid4(),
         name="Welcome to the Black Parade",
         length_seconds=5 * 60 + 11,
@@ -111,8 +112,8 @@ def test_from_sa_model_uses_defined_converters() -> None:
 
 
 def test_readonly_field_converts_and_returns_sa_field():
-    sa_artist = Artist.__sqlalchemy_type__(id=uuid4(), name="My Chemical Romance")
-    sa_track = Track.__sqlalchemy_type__(
+    sa_artist = SAType[Artist](id=uuid4(), name="My Chemical Romance")
+    sa_track = SAType[Track](
         id=uuid4(),
         name="Welcome to the Black Parade",
         length_seconds=5 * 60 + 11,
