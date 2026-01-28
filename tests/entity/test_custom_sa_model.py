@@ -1,6 +1,8 @@
 """Tests for customizing the generated SQLAlchemy model."""
 
-from typing import Annotated
+from sqlcrucible import SAType
+
+from typing import Annotated, ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import Field
@@ -33,12 +35,12 @@ class User(BaseTestEntity):
     first_name: Annotated[str, mapped_column()]
     last_name: Annotated[str, mapped_column()]
 
-    __sqlalchemy_type__ = lazyproperty(user_sqlalchemy_type)
+    __sqlalchemy_type__: ClassVar = lazyproperty(user_sqlalchemy_type)
 
 
 def test_custom_model_has_hybrid_property():
     """The customized SQLAlchemy model includes the hybrid property."""
-    sa_model = User.__sqlalchemy_type__(
+    sa_model = SAType[User](
         id=uuid4(),
         first_name="John",
         last_name="Doe",
@@ -59,7 +61,7 @@ def test_to_sa_model_preserves_hybrid_property():
 
 def test_from_sa_model_works_with_custom_model():
     """Converting from SA model works with customized model."""
-    sa_model = User.__sqlalchemy_type__(
+    sa_model = SAType[User](
         id=uuid4(),
         first_name="Alice",
         last_name="Wonder",

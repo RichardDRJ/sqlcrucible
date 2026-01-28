@@ -4,7 +4,7 @@ from sqlcrucible.utils.types.match import mro_distance
 
 from functools import cache
 from logging import getLogger
-from typing import Any, ClassVar, Literal, Self, TYPE_CHECKING
+from typing import Any, ClassVar, Final, Literal, Self, TYPE_CHECKING, get_origin
 
 from sqlalchemy import MetaData, Table
 from sqlalchemy.orm import DeclarativeBase
@@ -151,6 +151,9 @@ class SQLCrucibleEntity:
 
         annotations = get_annotations(cls, eval_str=True, format=Format.VALUE)
         for key, ann in annotations.items():
+            origin = get_origin(ann)
+            if origin is ClassVar or origin is Final or ann is ClassVar or ann is Final:
+                continue
             if (field_definition := SQLAlchemyFieldDefinition.from_typeform(key, ann)) is not None:
                 cls.__register_sqlalchemy_field_definition__(field_definition)
 

@@ -41,12 +41,21 @@ class GenericTypeTransformer(TypeTransformer):
         annotation: Any,
         chain: TypeTransformerChain,
     ) -> TypeTransformerResult:
-        tp = get_origin(annotation)
+        origin = get_origin(annotation)
         args = get_args(annotation)
-        inner = chain.apply(tp)
+        # Only transform args, not the origin. This works for builtins like list/dict
+        # but won't handle generic SQLCrucibleEntity classes (e.g. Box[Product] where
+        # Box itself is an entity). Generic entities are not currently supported.
+        transformed_results: list[TypeTransformerResult] = [chain.apply(arg) for arg in args]
+        merged_globals = {
+            key: value
+            for result in transformed_results
+            for key, value in result.additional_globals.items()
+        }
+        transformed_args = tuple(r.result for r in transformed_results)
         return TypeTransformerResult(
-            result=Annotated[inner.result, *args],
-            additional_globals=inner.additional_globals,
+            result=origin[*transformed_args],
+            additional_globals=merged_globals,
         )
 
 
