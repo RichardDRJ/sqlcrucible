@@ -1,6 +1,6 @@
 """SAType utility for type-safe access to entity SQLAlchemy types."""
 
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, Any, TYPE_CHECKING
 
 _S = TypeVar("_S", covariant=True)
 
@@ -39,3 +39,8 @@ class SAType(metaclass=SATypeMeta):
     @classmethod
     def __class_getitem__(cls, item: HasSAType[_S]) -> _S:
         return item.__sqlalchemy_type__
+
+    if TYPE_CHECKING:
+
+        def __setattr__(self, key: str, value: Any): ...
+        def __getattr__(self, key: str) -> Any: ...
