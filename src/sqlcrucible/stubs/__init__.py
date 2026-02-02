@@ -277,6 +277,19 @@ def _stub_path(root: Path, module_name: str) -> Path:
     )
 
 
+def _package_exists_in_source(package_name: str) -> bool:
+    """Check if a package exists in the source (not just as a stub)."""
+    import importlib.util
+
+    try:
+        spec = importlib.util.find_spec(package_name)
+        # A package exists if it has a submodule_search_locations (it's a package)
+        # and at least one location exists on disk
+        return spec is not None and spec.submodule_search_locations is not None
+    except (ModuleNotFoundError, ValueError):
+        return False
+
+
 def _write_to_stub_file(classdefs: list[ClassDef], stubs_root: Path, module_name: str):
     imports = [it for classdef in classdefs for it in classdef.imports]
 
@@ -286,13 +299,16 @@ def _write_to_stub_file(classdefs: list[ClassDef], stubs_root: Path, module_name
     stub_path = _stub_path(stubs_root, module_name)
     stub_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create __init__.pyi files in all parent directories
-    # so type checkers recognize them as packages
+    # Create __init__.pyi files in parent directories that don't exist in source.
+    # For packages that exist in source, we use namespace packages (no __init__.pyi)
+    # so type checkers can merge stubs with the real source.
     current = stubs_root
+    package_path = ""
     for part in module_name.split(".")[:-1]:
         current = current / part
+        package_path = f"{package_path}.{part}" if package_path else part
         init_file = current / "__init__.pyi"
-        if not init_file.exists():
+        if not init_file.exists() and not _package_exists_in_source(package_path):
             init_file.touch()
 
     with open(stub_path, "w") as fd:
