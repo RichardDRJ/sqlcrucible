@@ -8,10 +8,10 @@ The NoOpConverter still performs runtime type validation to catch mismatches
 early rather than allowing invalid values to propagate through the system.
 """
 
+from sqlcrucible.utils.types.annotations import unwrap
 from sqlcrucible.utils.types.equivalence import (
     types_are_non_parameterised_and_equal,
     types_are_noop_compatible,
-    strip_wrappers,
 )
 from typing import Any, get_origin
 
@@ -63,4 +63,4 @@ class NoOpConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return NoOpConverter(strip_wrappers(target_tp))
+        return NoOpConverter(unwrap(target_tp))

@@ -23,7 +23,7 @@ from typing import Any, Union, get_args, get_origin
 from sqlcrucible.conversion.exceptions import ConversionError, NoConverterFoundError
 from sqlcrucible.conversion.noop import NoOpConverter
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.equivalence import strip_wrappers
+from sqlcrucible.utils.types.annotations import unwrap
 
 
 def _is_union(tp: Any) -> bool:
@@ -42,7 +42,7 @@ def _is_union(tp: Any) -> bool:
     if origin is Union or origin is UnionType:
         return True
 
-    stripped = strip_wrappers(tp)
+    stripped = unwrap(tp)
     if stripped is not tp:
         stripped_origin = get_origin(stripped)
         return stripped_origin is Union or stripped_origin is UnionType
@@ -59,7 +59,7 @@ def _get_source_origin(source_tp: Any) -> type:
     Returns:
         The origin type (e.g., list for list[int], str for str).
     """
-    stripped = strip_wrappers(source_tp)
+    stripped = unwrap(source_tp)
     origin = get_origin(stripped)
     if origin is not None:
         return origin
@@ -138,13 +138,13 @@ class UnionConverterFactory(ConverterFactory[Any, Any]):
     ) -> Converter[Any, Any] | None:
         # Get union members, stripping wrappers if necessary
         if _is_union(source_tp):
-            stripped_source = strip_wrappers(source_tp)
+            stripped_source = unwrap(source_tp)
             source_members = list(dict.fromkeys(get_args(stripped_source)))
         else:
             source_members = [source_tp]
 
         if _is_union(target_tp):
-            stripped_target = strip_wrappers(target_tp)
+            stripped_target = unwrap(target_tp)
             target_members = list(dict.fromkeys(get_args(stripped_target)))
         else:
             target_members = [target_tp]

@@ -34,8 +34,20 @@ class TypeAnnotation:
             case typing.Annotated, (inner, *metadata):
                 tp, inner_qualifiers, inner_metadata = cls._walk_tp(inner, known_qualifiers)
                 return tp, inner_qualifiers, (*inner_metadata, *metadata)
-            case qualifier, inner if qualifier in known_qualifiers:
+            case qualifier, (inner,) if qualifier in known_qualifiers:
                 tp, inner_qualifiers, inner_metadata = cls._walk_tp(inner, known_qualifiers)
                 return tp, (qualifier, *inner_qualifiers), inner_metadata
             case _:
                 return annotation, (), ()
+
+
+def unwrap(tp: Any) -> Any:
+    """Unwrap a type annotation, removing qualifiers like Mapped, Required, and Annotated.
+
+    Args:
+        tp: The type annotation to unwrap.
+
+    Returns:
+        The inner type with all wrappers removed.
+    """
+    return TypeAnnotation.create(tp).tp
