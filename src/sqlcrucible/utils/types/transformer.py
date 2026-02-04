@@ -71,7 +71,7 @@ class LiteralTypeTransformer(TypeTransformer):
         return TypeTransformerResult(result=annotation)
 
 
-@dataclass
+@dataclass(slots=True)
 class TypeTransformerResult:
     """Result of transforming a type annotation.
 
