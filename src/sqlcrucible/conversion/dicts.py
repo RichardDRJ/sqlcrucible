@@ -24,8 +24,7 @@ from typing import (
 from typing_extensions import is_typeddict, NoExtraItems
 
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.annotations import TypeAnnotation
-from sqlcrucible.utils.types.equivalence import strip_wrappers
+from sqlcrucible.utils.types.annotations import TypeAnnotation, unwrap
 
 
 @dataclass(slots=True, frozen=True)
@@ -175,8 +174,8 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
     """
 
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
-        source_stripped = strip_wrappers(source_tp)
-        target_stripped = strip_wrappers(target_tp)
+        source_stripped = unwrap(source_tp)
+        target_stripped = unwrap(target_tp)
 
         source_origin = getattr(source_stripped, "__origin__", source_stripped)
         target_origin = getattr(target_stripped, "__origin__", target_stripped)
@@ -192,8 +191,8 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        source_stripped = strip_wrappers(source_tp)
-        target_stripped = strip_wrappers(target_tp)
+        source_stripped = unwrap(source_tp)
+        target_stripped = unwrap(target_tp)
 
         # Handle Any source type as unparameterized dict
         if source_stripped is Any:

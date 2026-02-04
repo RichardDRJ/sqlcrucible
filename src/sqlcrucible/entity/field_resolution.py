@@ -25,7 +25,7 @@ from sqlalchemy.orm import (
 from typing_extensions import get_annotations, Format, evaluate_forward_ref
 
 from sqlcrucible.conversion.registry import Converter
-from sqlcrucible.utils.types.equivalence import strip_wrappers
+from sqlcrucible.utils.types.annotations import unwrap
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
@@ -87,7 +87,7 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
     if (annotation := annotations.get(field_def.mapped_name)) is not None:
         evaluated = _recursively_evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
         # Strip Mapped[] wrapper since converters work with the inner type
-        return strip_wrappers(evaluated)
+        return unwrap(evaluated)
 
     attrs = inspect(sqlalchemy_type).attrs
     prop = attrs.get(field_def.mapped_name)
