@@ -148,6 +148,23 @@ class DictConverter(Converter[dict, dict]):
 
         return result
 
+    def safe_convert(self, source: dict) -> dict:
+        result: dict[Any, Any] = {}
+
+        for key, value in source.items():
+            if key in self._field_converters:
+                result[key] = self._field_converters[key].safe_convert(value)
+            elif self._extra_converter:
+                result[key] = self._extra_converter.safe_convert(value)
+            # else: drop key (target doesn't accept it)
+
+        # Check required fields
+        for key in self._field_converters:
+            if key not in result and self._target_info.get_required(key):
+                raise TypeError(f"Missing required key '{key}' for {self._target_info.tp}")
+
+        return result
+
 
 class DictConverterFactory(ConverterFactory[dict, dict]):
     """Factory that creates converters for dict-like type transformations.

@@ -31,6 +31,9 @@ class ToSAModelConverter(Converter[_E, Any]):
     def convert(self, source: _E) -> Any:
         return source.to_sa_model()
 
+    def safe_convert(self, source: _E) -> Any:
+        return self.convert(source)
+
 
 class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
@@ -65,6 +68,9 @@ class FromSAModelConverter(Converter[_E, Any]):
 
     def convert(self, source: _E) -> Any:
         return self._sqlcrucible_entity.from_sa_model(source)
+
+    def safe_convert(self, source: _E) -> Any:
+        return self.convert(source)
 
 
 class FromSAModelConverterFactory(ConverterFactory[Any, Any]):

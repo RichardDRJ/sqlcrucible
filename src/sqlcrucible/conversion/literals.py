@@ -46,10 +46,6 @@ def _get_literal_values(tp: Any) -> frozenset[Any]:
 class LiteralConverter(Converter[Any, Any]):
     """Converter that validates values against a target Literal type.
 
-    At runtime, this converter checks that the source value is one of the
-    target Literal's allowed values. If the value is valid, it's returned
-    unchanged; otherwise, a TypeMismatchError is raised.
-
     Attributes:
         _target_tp: The full target Literal type annotation.
         _allowed_values: The set of values allowed by the target Literal.
@@ -67,6 +63,9 @@ class LiteralConverter(Converter[Any, Any]):
         return source_values <= target_values
 
     def convert(self, source: Any) -> Any:
+        return source
+
+    def safe_convert(self, source: Any) -> Any:
         if source not in self._allowed_values:
             raise TypeMismatchError(
                 source,

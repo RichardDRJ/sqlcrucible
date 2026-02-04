@@ -65,10 +65,10 @@ def test_noop_converter_returns_same_object(registry: ConverterRegistry, tp, val
         (dict, [1, 2, 3]),
     ],
 )
-def test_noop_converter_raises_typeerror_on_value_not_matching_type(tp, value) -> None:
+def test_noop_converter_safe_convert_raises_typeerror_on_value_not_matching_type(tp, value) -> None:
     conv = NoOpConverter(tp)
     with pytest.raises(TypeMismatchError) as exc_info:
-        conv.convert(value)
+        conv.safe_convert(value)
     # Verify the exception contains useful context
     assert exc_info.value.source is value
     assert exc_info.value.target_type is tp
