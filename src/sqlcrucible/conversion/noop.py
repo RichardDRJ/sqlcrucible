@@ -10,6 +10,7 @@ early rather than allowing invalid values to propagate through the system.
 
 from sqlcrucible.utils.types.equivalence import (
     types_are_non_parameterised_and_equal,
+    types_are_noop_compatible,
     strip_wrappers,
 )
 from typing import Any, get_origin
@@ -46,16 +47,16 @@ class NoOpConverter(Converter[Any, Any]):
 
 
 class NoOpConverterFactory(ConverterFactory[Any, Any]):
-    """Factory that creates NoOpConverters for equivalent type pairs.
+    """Factory that creates NoOpConverters for compatible type pairs.
 
     This factory matches when the source and target types are structurally
-    equivalent (ignoring wrapper types like Annotated or Mapped). It's
-    typically registered first in the converter registry as a fast path
-    for the common case where no conversion is needed.
+    equivalent (ignoring wrapper types like Annotated or Mapped), or when
+    one of them is Any. It's typically registered first in the converter
+    registry as a fast path for the common case where no conversion is needed.
     """
 
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
-        return types_are_non_parameterised_and_equal(source_tp, target_tp)
+        return types_are_noop_compatible(source_tp, target_tp)
 
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry

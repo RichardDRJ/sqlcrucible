@@ -12,7 +12,7 @@ from sqlcrucible.conversion.function import FunctionConverter
 from sqlcrucible.conversion.registry import Converter
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SQLAlchemyField:
     """Configuration for mapping an entity field to SQLAlchemy.
 
@@ -44,12 +44,12 @@ class SQLAlchemyField:
         return result
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExcludeSAField:
     value: bool = True
 
 
-@dataclass
+@dataclass(slots=True)
 class ConvertFromSAWith:
     """Annotation specifying custom converter from SQLAlchemy to entity.
 
@@ -76,7 +76,7 @@ class ConvertFromSAWith:
         return FunctionConverter(self.fn)
 
 
-@dataclass
+@dataclass(slots=True)
 class ConvertToSAWith:
     """Annotation specifying custom converter from entity to SQLAlchemy.
 

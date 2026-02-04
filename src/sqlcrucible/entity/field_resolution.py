@@ -36,7 +36,7 @@ _S = TypeVar("_S")
 _E = TypeVar("_E", bound="SQLCrucibleEntity")
 
 
-@dataclass
+@dataclass(slots=True)
 class FieldConverter(Generic[_T, _S]):
     source_name: str
     mapped_name: str
