@@ -38,3 +38,6 @@ class FunctionConverter(Converter[Any, Any]):
 
     def convert(self, source: Any) -> Any:
         return self._fn(source)
+
+    def safe_convert(self, source: Any) -> Any:
+        return self.convert(source)

@@ -26,15 +26,21 @@ class SourceToTargetConverter(Converter[SourceItem, TargetItem]):
     def convert(self, source: SourceItem) -> TargetItem:
         return TargetItem(value=source.value * 2)
 
+    def safe_convert(self, source: SourceItem) -> TargetItem:
+        return self.convert(source)
+
 
 class TargetToSourceConverter(Converter[TargetItem, SourceItem]):
-    """Converts SourceItem to TargetItem."""
+    """Converts TargetItem to SourceItem."""
 
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return source_tp is TargetItem and target_tp is SourceItem
 
     def convert(self, source: TargetItem) -> SourceItem:
         return SourceItem(value=source.value // 2)
+
+    def safe_convert(self, source: TargetItem) -> SourceItem:
+        return self.convert(source)
 
 
 @pytest.fixture

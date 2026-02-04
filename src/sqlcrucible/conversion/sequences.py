@@ -61,6 +61,9 @@ class SequenceConverter(Converter[Sequence, KnownSequenceType]):
     def convert(self, source: Sequence) -> Any:
         return self._target(self._inner.convert(it) for it in source)
 
+    def safe_convert(self, source: Sequence) -> Any:
+        return self._target(self._inner.safe_convert(it) for it in source)
+
 
 class SequenceConverterFactory(ConverterFactory[Sequence, KnownSequenceType]):
     """Factory that creates converters for sequence-to-sequence transformations.

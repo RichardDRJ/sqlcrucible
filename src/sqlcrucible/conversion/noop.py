@@ -22,11 +22,10 @@ from sqlcrucible.conversion.registry import ConverterRegistry
 
 
 class NoOpConverter(Converter[Any, Any]):
-    """Converter that passes values through unchanged with type validation.
+    """Converter that passes values through unchanged.
 
     This converter is used when source and target types are equivalent and
-    no transformation is needed. It validates at runtime that the value
-    is actually an instance of the expected type.
+    no transformation is needed.
 
     Attributes:
         _target_tp: The full target type annotation.
@@ -41,6 +40,9 @@ class NoOpConverter(Converter[Any, Any]):
         return types_are_non_parameterised_and_equal(source_tp, target_tp)
 
     def convert(self, source: Any) -> Any:
+        return source
+
+    def safe_convert(self, source: Any) -> Any:
         if not (self._target_origin is Any or isinstance(source, self._target_origin)):
             raise TypeMismatchError(source, self._target_tp)
         return source
