@@ -17,8 +17,11 @@ def types_are_noop_compatible(source_tp: Any, target_tp: Any) -> bool:
 
     Types are compatible if:
     - They are equal (after stripping wrappers and ignoring type params)
-    - Source is Any (can be anything, pass through) AND target supports isinstance
     - Target is Any (accepts anything, pass through)
+    - Source is Any AND target is also Any
+
+    Note: Any -> T is NOT valid because we cannot prove Any is compatible with T.
+    T -> Any IS valid because T is a subtype of Any.
 
     TypedDict targets are excluded since they don't support isinstance checks,
     which the NoOpConverter relies on for runtime validation.
@@ -30,8 +33,14 @@ def types_are_noop_compatible(source_tp: Any, target_tp: Any) -> bool:
     if is_typeddict(target_tp):
         return False
 
-    if source_tp is Any or target_tp is Any:
+    # T -> Any is valid (T is subtype of Any)
+    # Any -> Any is also valid
+    if target_tp is Any:
         return True
+
+    # Any -> T is NOT valid (can't prove Any is T)
+    if source_tp is Any:
+        return False
 
     source_is_not_generic = get_origin(source_tp) is None
     return source_is_not_generic and source_tp is target_tp

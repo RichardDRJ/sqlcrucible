@@ -115,53 +115,23 @@ class TestDictToDict:
 
 
 class TestDictToTypedDict:
-    def test_converts_valid_dict(self, registry: ConverterRegistry):
+    def test_unparameterized_dict_to_typeddict_returns_none(self, registry: ConverterRegistry):
+        # dict has value type Any, and Any -> str/int cannot be proven valid
         converter = registry.resolve(dict, PersonDict)
-        assert converter is not None
-        result = converter.convert({"name": "Alice", "age": 30})
-        assert result == {"name": "Alice", "age": 30}
-        assert result["name"] == "Alice"
-        assert result["age"] == 30
+        assert converter is None
 
-    def test_raises_typeerror_on_missing_required_key(self, registry: ConverterRegistry):
-        converter = registry.resolve(dict, PersonDict)
-        assert converter is not None
-        with pytest.raises(TypeError) as exc_info:
-            converter.convert({"name": "Alice"})
-        assert "age" in str(exc_info.value)
-
-    def test_allows_missing_keys_for_partial(self, registry: ConverterRegistry):
-        converter = registry.resolve(dict, PartialDict)
-        assert converter is not None
-        result = converter.convert({})
-        assert result == {}
+    def test_any_value_dict_to_typeddict_returns_none(self, registry: ConverterRegistry):
+        # dict[str, Any] -> TypedDict[str, int] cannot be proven valid
+        # because Any -> int is not provably valid
+        converter = registry.resolve(dict[str, Any], PersonDict)
+        assert converter is None
 
     def test_unparameterized_dict_to_nested_typeddict_returns_none(
         self, registry: ConverterRegistry
     ):
         # dict has value type Any, and Any -> TypedDict has no converter
-        # (Any could be anything, not necessarily a dict)
         converter = registry.resolve(dict, NestedDict)
         assert converter is None
-
-    def test_via_registry_with_parameterized_dict(self, registry: ConverterRegistry):
-        converter = registry.resolve(dict[str, Any], PersonDict)
-        assert converter is not None
-        result = converter.convert({"name": "Eve", "age": 35})
-        assert result == {"name": "Eve", "age": 35}
-
-    def test_drops_extra_keys_for_closed_typeddict(self, registry: ConverterRegistry):
-        converter = registry.resolve(dict[str, Any], ClosedTypedDict)
-        assert converter is not None
-        result = converter.convert({"name": "Alice", "age": 30, "extra": "dropped"})
-        assert result == {"name": "Alice", "age": 30}
-        assert "extra" not in result
-
-    def test_preserves_extra_keys_for_open_typeddict(self, registry: ConverterRegistry):
-        converter = registry.resolve(dict[str, Any], OpenTypedDict)
-        assert converter is not None
-        result = converter.convert({"name": "Alice", "age": 30, "extra": "preserved"})
-        assert result == {"name": "Alice", "age": 30, "extra": "preserved"}
 
 
 class TestTypedDictToDict:
@@ -222,10 +192,10 @@ class TestKeyTypeMismatch:
         converter = registry.resolve(dict[int, str], dict[str, str])
         assert converter is None
 
-    def test_any_key_to_str_key_works(self, registry: ConverterRegistry):
-        # dict (Any keys) -> dict[str, int] should work
+    def test_any_key_to_str_key_returns_none(self, registry: ConverterRegistry):
+        # dict (Any keys) -> dict[str, int] should fail because Any -> str is not provable
         converter = registry.resolve(dict, dict[str, int])
-        assert converter is not None
+        assert converter is None
 
 
 class TestDictInfo:
