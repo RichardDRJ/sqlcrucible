@@ -19,6 +19,9 @@ def test_registry_returns_first_matching_converter() -> None:
         def convert(self, source: Any) -> Any:
             return self._result
 
+        def safe_convert(self, source: Any) -> Any:
+            return self.convert(source)
+
     first_converter = AlwaysMatchConverter("first")
     second_converter = AlwaysMatchConverter("second")
 

@@ -35,13 +35,35 @@ class Converter(Protocol[_I, _O]):
         ...
 
     def convert(self, source: _I) -> _O:
-        """Convert a value from source type to target type.
+        """Convert a value from source type to target type (fast path).
+
+        This method assumes the input is valid based on static type resolution.
+        It does not perform runtime type validation. Use safe_convert() when
+        runtime validation is needed (e.g., within union conversions).
 
         Args:
             source: The value to convert.
 
         Returns:
             The converted value.
+        """
+        ...
+
+    def safe_convert(self, source: _I) -> _O:
+        """Convert a value with runtime type validation.
+
+        This method validates the input at runtime and raises ConversionError
+        if the value doesn't match the expected type. Used by UnionConverter
+        when trying multiple converters in sequence.
+
+        Args:
+            source: The value to convert.
+
+        Returns:
+            The converted value.
+
+        Raises:
+            ConversionError: If the value cannot be converted.
         """
         ...
 

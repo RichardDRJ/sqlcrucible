@@ -81,10 +81,10 @@ def test_literal_converter_returns_value_when_valid(value, target_tp):
         (True, Literal["true"]),
     ],
 )
-def test_literal_converter_raises_error_when_value_not_in_literal(value, target_tp):
+def test_literal_converter_safe_convert_raises_error_when_value_not_in_literal(value, target_tp):
     converter = LiteralConverter(target_tp)
     with pytest.raises(TypeMismatchError) as exc_info:
-        converter.convert(value)
+        converter.safe_convert(value)
     assert exc_info.value.source is value
     assert exc_info.value.target_type is target_tp
 
@@ -92,7 +92,7 @@ def test_literal_converter_raises_error_when_value_not_in_literal(value, target_
 def test_literal_converter_error_message_contains_allowed_values():
     converter = LiteralConverter(Literal["a", "b", "c"])
     with pytest.raises(TypeMismatchError) as exc_info:
-        converter.convert("x")
+        converter.safe_convert("x")
     assert "x" in str(exc_info.value)
     assert "'a'" in str(exc_info.value)
     assert "'b'" in str(exc_info.value)

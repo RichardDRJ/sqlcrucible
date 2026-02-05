@@ -14,7 +14,7 @@ from typing import Any, Literal, get_args, get_origin
 
 from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.equivalence import strip_wrappers
+from sqlcrucible.utils.types.annotations import unwrap
 
 
 def _is_literal(tp: Any) -> bool:
@@ -26,7 +26,7 @@ def _is_literal(tp: Any) -> bool:
     Returns:
         True if the type is a Literal type (after stripping wrappers).
     """
-    stripped = strip_wrappers(tp)
+    stripped = unwrap(tp)
     return get_origin(stripped) is Literal
 
 
@@ -39,16 +39,12 @@ def _get_literal_values(tp: Any) -> frozenset[Any]:
     Returns:
         A frozenset of the allowed values.
     """
-    stripped = strip_wrappers(tp)
+    stripped = unwrap(tp)
     return frozenset(get_args(stripped))
 
 
 class LiteralConverter(Converter[Any, Any]):
     """Converter that validates values against a target Literal type.
-
-    At runtime, this converter checks that the source value is one of the
-    target Literal's allowed values. If the value is valid, it's returned
-    unchanged; otherwise, a TypeMismatchError is raised.
 
     Attributes:
         _target_tp: The full target Literal type annotation.
@@ -67,6 +63,9 @@ class LiteralConverter(Converter[Any, Any]):
         return source_values <= target_values
 
     def convert(self, source: Any) -> Any:
+        return source
+
+    def safe_convert(self, source: Any) -> Any:
         if source not in self._allowed_values:
             raise TypeMismatchError(
                 source,
@@ -96,4 +95,4 @@ class LiteralConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return LiteralConverter(strip_wrappers(target_tp))
+        return LiteralConverter(unwrap(target_tp))
