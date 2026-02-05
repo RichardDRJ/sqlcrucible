@@ -29,6 +29,7 @@ def test_writable_hybrid_on_sa_instance(writable_hybrid_engine):
         session.commit()
 
         loaded = session.scalar(select(sa_type))
+        assert loaded is not None
         assert loaded.full_name == "John Doe"
 
 

@@ -35,7 +35,7 @@ from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible.entity.fields import ReadonlyFieldDescriptor, readonly_field
 from sqlcrucible.entity.sa_type import SAType
 
 
@@ -44,7 +44,7 @@ orm_descriptor_metadata = MetaData()
 
 class DescriptorTestBase(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__abstract__": True, "metadata": orm_descriptor_metadata}
-    model_config = ConfigDict(ignored_types=(hybrid_property, readonly_field))
+    model_config = ConfigDict(ignored_types=(hybrid_property, ReadonlyFieldDescriptor))
 
 
 # --- Hybrid property function definitions (must be outside class body) ---
@@ -136,9 +136,7 @@ class EmployeeWithProxy(DescriptorTestBase):
         ),
     )
 
-    department_name: Annotated[
-        str, association_proxy("department", "name")
-    ] = readonly_field(str)
+    department_name: Annotated[str, association_proxy("department", "name")] = readonly_field(str)
 
 
 # --- Writable descriptor test models ---

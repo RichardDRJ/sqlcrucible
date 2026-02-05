@@ -12,7 +12,7 @@ from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible.entity.fields import ReadonlyFieldDescriptor, readonly_field
 
 
 metadata = MetaData()
@@ -23,7 +23,7 @@ class OneToOneBase(SQLCrucibleBaseModel):
 
 
 class User(OneToOneBase):
-    model_config = ConfigDict(ignored_types=(readonly_field,))
+    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
     __sqlalchemy_params__ = {"__tablename__": "oto_user"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
@@ -31,7 +31,7 @@ class User(OneToOneBase):
 
 
 class Profile(OneToOneBase):
-    model_config = ConfigDict(ignored_types=(readonly_field,))
+    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
     __sqlalchemy_params__ = {"__tablename__": "oto_profile"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)

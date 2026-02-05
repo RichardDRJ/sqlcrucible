@@ -52,7 +52,7 @@ When you query a `Track` and call `from_sa_model()`, the `artist` relationship i
 
 - **Cyclical references are not supported.** If `Artist` has a `tracks` relationship and `Track` has an `artist` relationship, use `readonly_field` on at least one side to break the cycle.
 
-- **Pydantic compatibility**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(readonly_field,))` to your model.
+- **Pydantic compatibility**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible.entity.fields`).
 
 - **Accessing without a backing model**: Accessing a `readonly_field` on an entity not loaded via `from_sa_model()` raises `RuntimeError`.
 

@@ -71,6 +71,7 @@ def test_hybrid_property_value_on_instance(hybrid_engine):
         session.commit()
 
         loaded = session.scalar(select(sa_type))
+        assert loaded is not None
         assert loaded.full_name == "John Doe"
         assert loaded.is_adult is True
 
@@ -85,6 +86,7 @@ def test_hybrid_property_roundtrip(hybrid_engine):
 
         sa_type = SAType[PersonWithHybridAnnotated]
         loaded_sa = session.scalar(select(sa_type))
+        assert loaded_sa is not None
 
         assert loaded_sa.full_name == "Jane Smith"
         assert loaded_sa.is_adult is True

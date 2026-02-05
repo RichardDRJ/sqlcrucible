@@ -3,7 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload, Self, get_origin, get_args, Annotated
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    TypeVar,
+    overload,
+    Self,
+    get_origin,
+    get_args,
+    Annotated,
+    cast,
+)
 
 from sqlalchemy.orm import ORMDescriptor
 
@@ -21,32 +32,10 @@ _O = TypeVar("_O", bound="SQLCrucibleEntity")
 _T = TypeVar("_T")
 
 
-class readonly_field(Generic[_T, _O]):
-    """Descriptor for read-only fields populated from SQLAlchemy relationships.
+class ReadonlyFieldDescriptor(Generic[_T, _O]):
+    """Descriptor implementation for readonly_field.
 
-    This descriptor allows defining fields that are loaded from SQLAlchemy
-    relationships but not included in the entity's constructor. The value is
-    lazily loaded from the SQLAlchemy model when accessed.
-
-    Example:
-        ```python
-        @dataclass
-        class Track(SQLCrucibleEntity):
-            __sqlalchemy_params__ = {"__tablename__": "track"}
-
-            id: Annotated[int, mapped_column(primary_key=True)]
-            title: Annotated[str, mapped_column()]
-            artist_id: Annotated[int, mapped_column(ForeignKey("artist.id"))]
-
-            # Read-only field loaded from relationship
-            artist = readonly_field(
-                Artist, SQLAlchemyField(attr=relationship(Artist, back_populates="tracks"))
-            )
-        ```
-
-    Type Parameters:
-        _T: The type of the field value
-        _O: The type of the owning entity class
+    See readonly_field() function for documentation.
     """
 
     def __init__(self, tp: Any, sa_field: SQLAlchemyField | None = None):
@@ -106,9 +95,7 @@ class readonly_field(Generic[_T, _O]):
             return None
 
         _, *metadata = get_args(ann)
-        descriptor = next(
-            (arg for arg in metadata if isinstance(arg, ORMDescriptor)), None
-        )
+        descriptor = next((arg for arg in metadata if isinstance(arg, ORMDescriptor)), None)
         return SQLAlchemyField(attr=descriptor) if descriptor else None
 
     @property
@@ -179,3 +166,60 @@ class readonly_field(Generic[_T, _O]):
                 )
 
             return self._converter.convert(getattr(model, field_info.mapped_name))
+
+
+@overload
+def readonly_field(tp: type[_T]) -> _T: ...
+
+
+@overload
+def readonly_field(tp: type[_T], sa_field: SQLAlchemyField) -> _T: ...
+
+
+@overload
+def readonly_field(tp: str) -> Any: ...
+
+
+@overload
+def readonly_field(tp: str, sa_field: SQLAlchemyField) -> Any: ...
+
+
+def readonly_field(tp: type[_T] | str, sa_field: SQLAlchemyField | None = None) -> Any:
+    """Create a readonly field descriptor.
+
+    Readonly fields are loaded from the SQLAlchemy model but cannot be set
+    on the entity. They are useful for computed properties like hybrid_property
+    and association_proxy.
+
+    Args:
+        tp: The type of the field value
+        sa_field: Optional SQLAlchemyField configuration for the mapped attribute.
+            If not provided and the field has an Annotated type with an ORMDescriptor,
+            the descriptor is automatically extracted.
+
+    Returns:
+        A descriptor that loads the field value from the backing SQLAlchemy model.
+
+    Example:
+        ```python
+        class Person(SQLCrucibleBaseModel):
+            first_name: Annotated[str, mapped_column()]
+            last_name: Annotated[str, mapped_column()]
+
+            # Using Annotated syntax (descriptor extracted automatically)
+            full_name: Annotated[str, hybrid_property(_full_name)] = readonly_field(str)
+
+            # Using explicit SQLAlchemyField
+            full_name = readonly_field(
+                str,
+                SQLAlchemyField(attr=hybrid_property(_full_name)),
+            )
+        ```
+
+    Note:
+        Accessing a readonly_field on an entity not loaded via from_sa_model()
+        raises RuntimeError. For Pydantic models, add readonly_field to
+        model_config's ignored_types or inherit from SQLCrucibleBaseModel.
+    """
+
+    return cast(_T, ReadonlyFieldDescriptor(tp, sa_field))

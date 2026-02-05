@@ -33,6 +33,7 @@ def test_association_proxy_access(association_proxy_engine):
         session.commit()
 
         loaded_emp = session.scalar(select(emp_sa))
+        assert loaded_emp is not None
         assert loaded_emp.department_name == "Engineering"
 
 

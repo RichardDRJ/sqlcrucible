@@ -90,11 +90,7 @@ def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     annotated_field_defs = [f for f in field_defs if needs_annotation(f)]
 
     # All fields with mapped_attr become class attributes (mapped_column, relationship, etc.)
-    field_defaults = {
-        f.mapped_name: f.mapped_attr
-        for f in field_defs
-        if f.mapped_attr is not None
-    }
+    field_defaults = {f.mapped_name: f.mapped_attr for f in field_defs if f.mapped_attr is not None}
 
     # Transform field types for annotations (columns and relationships, but not computed descriptors)
     field_transform_results = {
