@@ -136,16 +136,13 @@ class TestDictToTypedDict:
         result = converter.convert({})
         assert result == {}
 
-    def test_handles_nested_typeddict(self, registry: ConverterRegistry):
+    def test_unparameterized_dict_to_nested_typeddict_returns_none(
+        self, registry: ConverterRegistry
+    ):
+        # dict has value type Any, and Any -> TypedDict has no converter
+        # (Any could be anything, not necessarily a dict)
         converter = registry.resolve(dict, NestedDict)
-        assert converter is not None
-        result = converter.convert(
-            {
-                "person": {"name": "Charlie", "age": 40},
-                "active": True,
-            }
-        )
-        assert result == {"person": {"name": "Charlie", "age": 40}, "active": True}
+        assert converter is None
 
     def test_via_registry_with_parameterized_dict(self, registry: ConverterRegistry):
         converter = registry.resolve(dict[str, Any], PersonDict)
