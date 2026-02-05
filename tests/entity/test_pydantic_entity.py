@@ -9,7 +9,7 @@ from sqlcrucible.entity.annotations import (
     ConvertToSAWith,
     ConvertFromSAWith,
 )
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible.entity.fields import ReadonlyFieldDescriptor, readonly_field
 
 from datetime import timedelta
 
@@ -27,7 +27,7 @@ class BaseTestEntity(SQLCrucibleBaseModel):
 
 
 class Artist(BaseTestEntity):
-    model_config = ConfigDict(ignored_types=(readonly_field,))
+    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
     __sqlalchemy_params__ = {"__tablename__": "artist"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
@@ -35,7 +35,7 @@ class Artist(BaseTestEntity):
 
 
 class Track(BaseTestEntity, BaseModel):
-    model_config = ConfigDict(ignored_types=(readonly_field,))
+    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
     __sqlalchemy_params__ = {"__tablename__": "track"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)

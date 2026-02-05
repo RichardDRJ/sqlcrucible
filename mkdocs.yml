@@ -45,6 +45,7 @@ markdown_extensions:
       alternate_style: true
   - admonition
   - pymdownx.details
+  - footnotes
 
 nav:
   - Home: index.md
@@ -52,6 +53,7 @@ nav:
   - User Guide:
     - Defining Entities: guide/defining-entities.md
     - Relationships: guide/relationships.md
+    - ORM Descriptors: guide/orm-descriptors.md
     - Type Conversion: guide/type-conversion.md
     - Field Mapping: guide/field-mapping.md
     - Inheritance: guide/inheritance.md

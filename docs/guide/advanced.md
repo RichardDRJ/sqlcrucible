@@ -2,36 +2,36 @@
 
 ## Customizing the Generated Model
 
-Override `__sqlalchemy_type__` with a `lazyproperty` to customize the generated SQLAlchemy model:
+For most use cases, SQLCrucible's built-in support for ORM descriptors is sufficient. See the [ORM Descriptors](orm-descriptors.md) guide for `hybrid_property` and `association_proxy` support.
+
+For advanced customization beyond what's covered there, you can override `__sqlalchemy_type__` with a `lazyproperty`:
 
 ```python
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlcrucible.utils.properties import lazyproperty
 from sqlcrucible import SQLCrucibleEntity
 
 def user_sqlalchemy_type(cls: type["User"]):
     class CustomModel(cls.__sqlalchemy_automodel__):
-        @hybrid_property
-        def full_name(self):
-            return f"{self.first_name} {self.last_name}"
+        def custom_method(self):
+            return f"Custom: {self.name}"
 
     return CustomModel
 
 class User(SQLCrucibleEntity):
     __sqlalchemy_params__ = {"__tablename__": "user"}
-    first_name: str
-    last_name: str
+    name: str
 
     __sqlalchemy_type__ = lazyproperty(user_sqlalchemy_type)
 ```
 
-This allows you to add hybrid properties, custom methods, or any other SQLAlchemy-specific functionality to the generated model.
+This allows you to add custom methods or any other SQLAlchemy-specific functionality to the generated model.
 
 ## Reusing Existing SQLAlchemy Models
 
 You can attach a SQLCrucible entity to an existing SQLAlchemy model:
 
 ```python
+from typing import Annotated
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlcrucible import SQLCrucibleEntity
 
@@ -59,6 +59,10 @@ class User(SQLCrucibleEntity):
 You can create multiple entity classes that map to the same SQLAlchemy model but expose different fields:
 
 ```python
+from typing import Annotated
+from sqlalchemy.orm import mapped_column
+from sqlcrucible import SQLCrucibleEntity
+
 # Full entity with all fields
 class User(SQLCrucibleEntity):
     __sqlalchemy_type__ = UserModel

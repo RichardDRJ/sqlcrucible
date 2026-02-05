@@ -103,6 +103,9 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
         case CompositeProperty():
             return prop.composite_class
         case _:
+            # Fall back to source type for descriptors like hybrid_property
+            if field_def.source_tp is not None:
+                return field_def.source_tp
             prop_type = type(prop).__name__ if prop is not None else "None"
             raise TypeError(
                 f"Cannot determine type for field '{field_def.source_name}' in {cls.__name__}: "
