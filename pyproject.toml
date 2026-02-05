@@ -49,6 +49,10 @@ lint = [
 depcheck = [
     "deptry",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.27",
+]
 dev = [
     "nox>=2024.4.15",
     { include-group = "test" },
