@@ -197,7 +197,7 @@
 
         department = readonly_field(
             Department,
-            SQLAlchemyField(attr=relationship(lambda: SAType[Department])),
+            relationship(lambda: SAType[Department]),
         )
 
         # Direct access to department.name

@@ -58,6 +58,7 @@ artist = readonly_field(
 
 # Or pass SQLAlchemyField first - order doesn't matter
 artist = readonly_field(
+    Artist,
     SQLAlchemyField(name="custom_artist_col"),
     relationship(lambda: SAType[Artist]),
 )
@@ -82,10 +83,7 @@ class Artist(SQLCrucibleBaseModel):
     # One-to-many: artist has many tracks
     tracks = readonly_field(
         list["Track"],
-        SQLAlchemyField(
-            name="tracks",
-            attr=relationship(lambda: SAType[Track], back_populates="artist"),
-        ),
+        relationship(lambda: SAType[Track], back_populates="artist"),
     )
 
 class Track(SQLCrucibleBaseModel):
@@ -97,9 +95,6 @@ class Track(SQLCrucibleBaseModel):
     # Many-to-one: track belongs to artist
     artist = readonly_field(
         Artist,
-        SQLAlchemyField(
-            name="artist",
-            attr=relationship(lambda: SAType[Artist], back_populates="tracks"),
-        ),
+        relationship(lambda: SAType[Artist], back_populates="tracks"),
     )
 ```

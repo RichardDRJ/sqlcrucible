@@ -75,9 +75,12 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
 
         # Build SQLAlchemyField from provided arguments or extract from annotation
         sa_field = self._sa_field
-        if sa_field is None and self._descriptor is not None:
-            # Descriptor provided directly - wrap in SQLAlchemyField
-            sa_field = SQLAlchemyField(attr=self._descriptor)
+        if self._descriptor is not None:
+            # Merge descriptor into sa_field (or create new one if sa_field is None)
+            sa_field = SQLAlchemyField.merge_all(
+                sa_field,
+                SQLAlchemyField(attr=self._descriptor),
+            )
         elif sa_field is None:
             # Try to extract from annotation
             sa_field = self._extract_sa_field_from_annotation(owner, name)

@@ -56,11 +56,9 @@ with Session(engine) as session:
 
 ### Alternative Syntax
 
-You can also use `SQLAlchemyField` for more explicit control:
+You can also pass the descriptor directly to `readonly_field` instead of using `Annotated`:
 
 ```python
-from sqlcrucible.entity.annotations import SQLAlchemyField
-
 class Person(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "person"}
 
@@ -68,10 +66,18 @@ class Person(SQLCrucibleBaseModel):
     first_name: Annotated[str, mapped_column()]
     last_name: Annotated[str, mapped_column()]
 
-    full_name = readonly_field(
-        str,
-        SQLAlchemyField(name="full_name", attr=hybrid_property(_full_name)),
-    )
+    # Pass descriptor directly - no annotation needed
+    full_name = readonly_field(str, hybrid_property(_full_name))
+```
+
+For advanced cases (e.g., custom mapped name), you can pass both a descriptor and `SQLAlchemyField`:
+
+```python
+from sqlcrucible.entity.annotations import SQLAlchemyField
+
+# Order doesn't matter - both are equivalent
+full_name = readonly_field(str, hybrid_property(_full_name), SQLAlchemyField(name="custom_name"))
+full_name = readonly_field(str, SQLAlchemyField(name="custom_name"), hybrid_property(_full_name))
 ```
 
 ### Writable hybrid_property
