@@ -79,3 +79,10 @@ def coverage(session: nox.Session) -> None:
         "--cov-report=html",
         *session.posargs,
     )
+
+
+@nox.session(python=MIN_PYTHON_VERSION, default=False)
+def docs(session: nox.Session) -> None:
+    """Build and serve documentation locally."""
+    uv("sync", "--group", "docs", session=session)
+    session.run("mkdocs", "serve")

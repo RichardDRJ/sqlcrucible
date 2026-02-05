@@ -20,3 +20,6 @@ htmlcov/
 # Nox
 .nox/
 .claude
+
+# MkDocs
+site/
