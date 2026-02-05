@@ -12,7 +12,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 from sqlcrucible import SQLCrucibleBaseModel, SAType
 from sqlcrucible.entity.fields import readonly_field
-from sqlcrucible.entity.annotations import SQLAlchemyField
 
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
@@ -25,13 +24,10 @@ class Track(SQLCrucibleBaseModel):
     name: str
     artist_id: Annotated[UUID, mapped_column(ForeignKey("artist.id"))]
 
-    # Read-only relationship field
+    # Read-only relationship field - pass descriptor directly
     artist = readonly_field(
         Artist,
-        SQLAlchemyField(
-            name="artist",
-            attr=relationship(lambda: SAType[Artist]),
-        ),
+        relationship(lambda: SAType[Artist], back_populates="tracks"),
     )
 ```
 
@@ -47,6 +43,25 @@ The `readonly_field` descriptor:
 3. **Loads the related entity** when accessed via `from_sa_model()`
 
 When you query a `Track` and call `from_sa_model()`, the `artist` relationship is automatically converted to an `Artist` entity.
+
+## Advanced Usage
+
+You can pass both a descriptor (like `relationship`, `hybrid_property`, or `association_proxy`) and `SQLAlchemyField` in any order. This gives you full control over both the descriptor and its SQLAlchemy configuration:
+
+```python
+# Pass descriptor first, then SQLAlchemyField for custom name
+artist = readonly_field(
+    Artist,
+    relationship(lambda: SAType[Artist]),
+    SQLAlchemyField(name="custom_artist_col"),
+)
+
+# Or pass SQLAlchemyField first - order doesn't matter
+artist = readonly_field(
+    SQLAlchemyField(name="custom_artist_col"),
+    relationship(lambda: SAType[Artist]),
+)
+```
 
 ## Important Notes
 

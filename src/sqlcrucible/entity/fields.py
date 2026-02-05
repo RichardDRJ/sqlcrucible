@@ -38,14 +38,21 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
     See readonly_field() function for documentation.
     """
 
-    def __init__(self, tp: Any, sa_field: SQLAlchemyField | None = None):
+    def __init__(
+        self,
+        tp: Any,
+        descriptor: ORMDescriptor[Any] | None = None,
+        sa_field: SQLAlchemyField | None = None,
+    ):
         """Initialize a readonly field descriptor.
 
         Args:
             tp: The type of the field value (can be a type, string forward ref, or parameterized type)
+            descriptor: Optional ORM descriptor (e.g., hybrid_property, association_proxy)
             sa_field: Optional SQLAlchemyField configuration for the mapped attribute
         """
         self._tp = tp
+        self._descriptor = descriptor
         self._sa_field = sa_field
         self._converter: Converter[Any, _T] | None = None
         self._sa_field_info: SQLAlchemyFieldDefinition | None = None
@@ -66,9 +73,13 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
         self._name = name
         self._owner = owner
 
-        # Extract ORMDescriptor from annotation if no explicit sa_field was provided
+        # Build SQLAlchemyField from provided arguments or extract from annotation
         sa_field = self._sa_field
-        if sa_field is None:
+        if sa_field is None and self._descriptor is not None:
+            # Descriptor provided directly - wrap in SQLAlchemyField
+            sa_field = SQLAlchemyField(attr=self._descriptor)
+        elif sa_field is None:
+            # Try to extract from annotation
             sa_field = self._extract_sa_field_from_annotation(owner, name)
 
         # Register a preliminary field definition without resolving forward refs yet.
@@ -173,7 +184,16 @@ def readonly_field(tp: type[_T]) -> _T: ...
 
 
 @overload
-def readonly_field(tp: type[_T], sa_field: SQLAlchemyField) -> _T: ...
+def readonly_field(tp: type[_T], arg1: SQLAlchemyField | ORMDescriptor[Any], /) -> _T: ...
+
+
+@overload
+def readonly_field(
+    tp: type[_T],
+    arg1: SQLAlchemyField | ORMDescriptor[Any],
+    arg2: SQLAlchemyField | ORMDescriptor[Any],
+    /,
+) -> _T: ...
 
 
 @overload
@@ -181,10 +201,19 @@ def readonly_field(tp: str) -> Any: ...
 
 
 @overload
-def readonly_field(tp: str, sa_field: SQLAlchemyField) -> Any: ...
+def readonly_field(tp: str, arg1: SQLAlchemyField | ORMDescriptor[Any], /) -> Any: ...
 
 
-def readonly_field(tp: type[_T] | str, sa_field: SQLAlchemyField | None = None) -> Any:
+@overload
+def readonly_field(
+    tp: str,
+    arg1: SQLAlchemyField | ORMDescriptor[Any],
+    arg2: SQLAlchemyField | ORMDescriptor[Any],
+    /,
+) -> Any: ...
+
+
+def readonly_field(tp: type[_T] | str, *args: SQLAlchemyField | ORMDescriptor[Any]) -> Any:
     """Create a readonly field descriptor.
 
     Readonly fields are loaded from the SQLAlchemy model but cannot be set
@@ -193,33 +222,66 @@ def readonly_field(tp: type[_T] | str, sa_field: SQLAlchemyField | None = None) 
 
     Args:
         tp: The type of the field value
-        sa_field: Optional SQLAlchemyField configuration for the mapped attribute.
-            If not provided and the field has an Annotated type with an ORMDescriptor,
-            the descriptor is automatically extracted.
+        *args: Optional SQLAlchemyField and/or ORMDescriptor (e.g., hybrid_property,
+            association_proxy) in any order. If both are provided, the descriptor
+            is merged into the SQLAlchemyField. If neither is provided, the descriptor
+            is extracted from the field's Annotated type if present.
 
     Returns:
         A descriptor that loads the field value from the backing SQLAlchemy model.
 
     Example:
         ```python
+        def _full_name(self) -> str:
+            return f"{self.first_name} {self.last_name}"
+
+
         class Person(SQLCrucibleBaseModel):
             first_name: Annotated[str, mapped_column()]
             last_name: Annotated[str, mapped_column()]
 
-            # Using Annotated syntax (descriptor extracted automatically)
+            # Simplest: pass descriptor directly
+            full_name = readonly_field(str, hybrid_property(_full_name))
+
+            # Alternative: use Annotated syntax (descriptor extracted automatically)
             full_name: Annotated[str, hybrid_property(_full_name)] = readonly_field(str)
 
-            # Using explicit SQLAlchemyField
+            # With SQLAlchemyField (order doesn't matter)
             full_name = readonly_field(
                 str,
-                SQLAlchemyField(attr=hybrid_property(_full_name)),
+                hybrid_property(_full_name),
+                SQLAlchemyField(name="computed_full_name"),
+            )
+
+            # Or reversed order
+            full_name = readonly_field(
+                str,
+                SQLAlchemyField(name="computed_full_name"),
+                hybrid_property(_full_name),
             )
         ```
 
     Note:
         Accessing a readonly_field on an entity not loaded via from_sa_model()
-        raises RuntimeError. For Pydantic models, add readonly_field to
+        raises RuntimeError. For Pydantic models, add ReadonlyFieldDescriptor to
         model_config's ignored_types or inherit from SQLCrucibleBaseModel.
     """
+    descriptor: ORMDescriptor[Any] | None = None
+    sa_field: SQLAlchemyField | None = None
 
-    return cast(_T, ReadonlyFieldDescriptor(tp, sa_field))
+    for arg in args:
+        if isinstance(arg, SQLAlchemyField):
+            if sa_field is not None:
+                raise TypeError("readonly_field() got multiple SQLAlchemyField arguments")
+            sa_field = arg
+        elif isinstance(arg, ORMDescriptor):
+            if descriptor is not None:
+                raise TypeError("readonly_field() got multiple ORMDescriptor arguments")
+            descriptor = arg
+        else:
+            raise TypeError(
+                f"readonly_field() arguments must be SQLAlchemyField or ORMDescriptor, "
+                f"got {type(arg).__name__}"
+            )
+
+    return cast(_T, ReadonlyFieldDescriptor(tp, descriptor, sa_field))

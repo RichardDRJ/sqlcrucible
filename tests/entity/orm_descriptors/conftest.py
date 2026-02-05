@@ -62,7 +62,7 @@ def _is_adult(self) -> bool:
 
 
 class PersonWithHybridExplicit(DescriptorTestBase):
-    """Person using explicit SQLAlchemyField(attr=hybrid_property(...)) syntax."""
+    """Person using explicit descriptor argument syntax."""
 
     __sqlalchemy_params__ = {"__tablename__": "person_hybrid_explicit"}
 
@@ -71,14 +71,9 @@ class PersonWithHybridExplicit(DescriptorTestBase):
     last_name: Annotated[str, mapped_column()]
     age: Annotated[int, mapped_column()]
 
-    full_name = readonly_field(
-        str,
-        SQLAlchemyField(name="full_name", attr=hybrid_property(_full_name)),
-    )
-    is_adult = readonly_field(
-        bool,
-        SQLAlchemyField(name="is_adult", attr=hybrid_property(_is_adult)),
-    )
+    # New cleaner syntax: pass descriptor directly
+    full_name = readonly_field(str, hybrid_property(_full_name))
+    is_adult = readonly_field(bool, hybrid_property(_is_adult))
 
 
 class PersonWithHybridAnnotated(DescriptorTestBase):
