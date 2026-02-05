@@ -52,6 +52,7 @@ depcheck = [
 docs = [
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.27",
+    "mike>=2.1",
 ]
 dev = [
     "nox>=2024.4.15",

@@ -57,3 +57,7 @@ nav:
     - Advanced: guide/advanced.md
   - API Reference: reference/api.md
   - Comparison: comparison.md
+
+extra:
+  version:
+    provider: mike
