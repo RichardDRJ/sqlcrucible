@@ -25,6 +25,10 @@ from sqlcrucible.conversion.registry import Converter, ConverterFactory, Convert
 from sqlcrucible.utils.types.annotations import TypeAnnotation, unwrap
 
 
+class _IncompatibleTypes(Exception):
+    """Raised internally when types cannot be converted."""
+
+
 @dataclass(slots=True, frozen=True)
 class DictInfo:
     """Information about a dict-like type (dict or TypedDict).
@@ -34,12 +38,14 @@ class DictInfo:
         key_type: The key type (str for TypedDict, extracted K for dict[K,V], Any for dict).
         fields: Mapping of field names to their type annotations.
         extra_items: Type annotation for extra items, or None if closed.
+        required_fields: Set of field names that are required.
     """
 
     tp: type
     key_type: Any  # type or Any
     fields: dict[str, TypeAnnotation]
     extra_items: TypeAnnotation | None
+    required_fields: frozenset[str]
 
     @classmethod
     def create(cls, tp: type) -> Self:
@@ -64,7 +70,32 @@ class DictInfo:
                 extra_items_tp if extra_items_tp is not NoExtraItems else Any
             )
 
-        return cls(tp=tp, key_type=str, fields=fields, extra_items=extra_items)
+        total = getattr(tp, "__total__", True)
+        required_fields = frozenset(
+            name
+            for name, annotation in fields.items()
+            if cls._is_field_required(annotation, total=total)
+        )
+
+        return cls(
+            tp=tp,
+            key_type=str,
+            fields=fields,
+            extra_items=extra_items,
+            required_fields=required_fields,
+        )
+
+    @staticmethod
+    def _is_field_required(annotation: TypeAnnotation, *, total: bool) -> bool:
+        """Determine if a field is required based on its annotation and total flag."""
+        required_qualifier = next(
+            (q for q in annotation.qualifiers if q in (Required, NotRequired)), None
+        )
+        if required_qualifier is Required:
+            return True
+        if required_qualifier is NotRequired:
+            return False
+        return total
 
     @classmethod
     def _from_dict(cls, tp: type) -> Self:
@@ -75,6 +106,7 @@ class DictInfo:
             key_type=key_tp,
             fields={},
             extra_items=TypeAnnotation.create(val_tp),
+            required_fields=frozenset(),
         )
 
     def get_tp(self, key: str) -> TypeAnnotation | None:
@@ -86,21 +118,9 @@ class DictInfo:
     def get_required(self, key: str) -> bool:
         """Check if a key is required in this dict type."""
         if key in self.fields:
-            annotation = self.fields[key]
-
-            required_qualifier = next(
-                (it for it in annotation.qualifiers if it in (Required, NotRequired)), None
-            )
-            return (
-                True
-                if required_qualifier is Required
-                else False
-                if required_qualifier is NotRequired
-                else getattr(self.tp, "__total__", True)
-            )
-        elif self.extra_items is not None:
+            return key in self.required_fields
+        if self.extra_items is not None:
             return False
-
         raise TypeError(
             f"Attempting to find whether key {key} is required in type {self.tp} which cannot contain key {key}"
         )
@@ -128,38 +148,41 @@ class DictConverter(Converter[dict, dict]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return True
 
+    def _get_converter(self, key: str) -> Converter[Any, Any] | None:
+        """Get the converter for a key, or None if the key should be dropped."""
+        if key in self._field_converters:
+            return self._field_converters[key]
+        return self._extra_converter
+
+    def _check_required_fields(self, result: dict[Any, Any]) -> None:
+        """Raise TypeError if any required field is missing from result."""
+        missing = next(
+            (
+                k
+                for k in self._field_converters
+                if k not in result and self._target_info.get_required(k)
+            ),
+            None,
+        )
+        if missing:
+            raise TypeError(f"Missing required key '{missing}' for {self._target_info.tp}")
+
     def convert(self, source: dict) -> dict:
-        result: dict[Any, Any] = {}
-
-        for key, value in source.items():
-            if key in self._field_converters:
-                result[key] = self._field_converters[key].convert(value)
-            elif self._extra_converter:
-                result[key] = self._extra_converter.convert(value)
-            # else: drop key (target doesn't accept it)
-
-        # Check required fields
-        for key in self._field_converters:
-            if key not in result and self._target_info.get_required(key):
-                raise TypeError(f"Missing required key '{key}' for {self._target_info.tp}")
-
+        result = {
+            key: conv.convert(value)
+            for key, value in source.items()
+            if (conv := self._get_converter(key))
+        }
+        self._check_required_fields(result)
         return result
 
     def safe_convert(self, source: dict) -> dict:
-        result: dict[Any, Any] = {}
-
-        for key, value in source.items():
-            if key in self._field_converters:
-                result[key] = self._field_converters[key].safe_convert(value)
-            elif self._extra_converter:
-                result[key] = self._extra_converter.safe_convert(value)
-            # else: drop key (target doesn't accept it)
-
-        # Check required fields
-        for key in self._field_converters:
-            if key not in result and self._target_info.get_required(key):
-                raise TypeError(f"Missing required key '{key}' for {self._target_info.tp}")
-
+        result = {
+            key: conv.safe_convert(value)
+            for key, value in source.items()
+            if (conv := self._get_converter(key))
+        }
+        self._check_required_fields(result)
         return result
 
 
@@ -183,6 +206,51 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
 
         return source_is_dict and target_is_dict
 
+    def _resolve_field_converters(
+        self, source_info: DictInfo, target_info: DictInfo, registry: ConverterRegistry
+    ) -> dict[str, Converter[Any, Any]]:
+        """Resolve converters for all fields. Raises _IncompatibleTypes on failure."""
+        all_keys = source_info.fields.keys() | target_info.fields.keys()
+
+        # Check for required fields that source can't provide
+        if any(
+            target_info.get_required(k)
+            for k in all_keys
+            if source_info.get_tp(k) is None and target_info.get_tp(k) is not None
+        ):
+            raise _IncompatibleTypes()
+
+        # Build converters for keys where both have types
+        converters = {
+            k: conv
+            for k in all_keys
+            if (src := source_info.get_tp(k))
+            and (tgt := target_info.get_tp(k))
+            and (conv := registry.resolve(src.tp, tgt.tp))
+        }
+
+        # Check all expected converters were found (none resolved to None)
+        expected = sum(
+            1
+            for k in all_keys
+            if source_info.get_tp(k) is not None and target_info.get_tp(k) is not None
+        )
+        if len(converters) != expected:
+            raise _IncompatibleTypes()
+
+        return converters
+
+    def _resolve_extra_converter(
+        self, source_info: DictInfo, target_info: DictInfo, registry: ConverterRegistry
+    ) -> Converter[Any, Any] | None:
+        """Resolve extra items converter. Raises _IncompatibleTypes on failure."""
+        if source_info.extra_items is None or target_info.extra_items is None:
+            return None
+        conv = registry.resolve(source_info.extra_items.tp, target_info.extra_items.tp)
+        if conv is None:
+            raise _IncompatibleTypes()
+        return conv
+
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
@@ -192,46 +260,13 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
         source_info = DictInfo.create(source_stripped)
         target_info = DictInfo.create(target_stripped)
 
-        # Verify key types are compatible (NoOp converter exists)
-        key_converter = registry.resolve(source_info.key_type, target_info.key_type)
-        if key_converter is None:
+        if registry.resolve(source_info.key_type, target_info.key_type) is None:
             return None
 
-        field_converters: dict[str, Converter[Any, Any]] = {}
-
-        # Collect all field names from both source and target
-        all_keys = set(source_info.fields.keys()) | set(target_info.fields.keys())
-
-        for key in all_keys:
-            source_val_tp = source_info.get_tp(key)
-            target_val_tp = target_info.get_tp(key)
-
-            if target_val_tp is None:
-                # Target doesn't accept this key (closed TypedDict without this field)
-                # Skip - will be dropped during conversion
-                continue
-
-            if source_val_tp is None:
-                # Source has no type for this key but target requires it
-                if target_info.get_required(key):
-                    return None
-                # Optional in target, skip
-                continue
-
-            # Resolve value converter
-            value_converter = registry.resolve(source_val_tp.tp, target_val_tp.tp)
-            if value_converter is None:
-                return None
-
-            field_converters[key] = value_converter
-
-        # Handle extra items converter if both have extra_items
-        extra_converter: Converter[Any, Any] | None = None
-        if source_info.extra_items is not None and target_info.extra_items is not None:
-            extra_converter = registry.resolve(
-                source_info.extra_items.tp, target_info.extra_items.tp
-            )
-            if extra_converter is None:
-                return None
+        try:
+            field_converters = self._resolve_field_converters(source_info, target_info, registry)
+            extra_converter = self._resolve_extra_converter(source_info, target_info, registry)
+        except _IncompatibleTypes:
+            return None
 
         return DictConverter(target_info, field_converters, extra_converter)
