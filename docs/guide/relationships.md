@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from pydantic import Field
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
-from sqlcrucible import SQLCrucibleBaseModel
+from sqlcrucible import SQLCrucibleBaseModel, SAType
 from sqlcrucible.entity.fields import readonly_field
 from sqlcrucible.entity.annotations import SQLAlchemyField
 
@@ -30,7 +30,7 @@ class Track(SQLCrucibleBaseModel):
         Artist,
         SQLAlchemyField(
             name="artist",
-            attr=relationship(lambda: Artist.__sqlalchemy_type__),
+            attr=relationship(lambda: SAType[Artist]),
         ),
     )
 ```
@@ -69,7 +69,7 @@ class Artist(SQLCrucibleBaseModel):
         list["Track"],
         SQLAlchemyField(
             name="tracks",
-            attr=relationship(lambda: Track.__sqlalchemy_type__, back_populates="artist"),
+            attr=relationship(lambda: SAType[Track], back_populates="artist"),
         ),
     )
 
@@ -84,7 +84,7 @@ class Track(SQLCrucibleBaseModel):
         Artist,
         SQLAlchemyField(
             name="artist",
-            attr=relationship(lambda: Artist.__sqlalchemy_type__, back_populates="tracks"),
+            attr=relationship(lambda: SAType[Artist], back_populates="tracks"),
         ),
     )
 ```

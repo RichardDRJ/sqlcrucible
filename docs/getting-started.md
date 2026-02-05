@@ -117,7 +117,7 @@ class Artist(SQLCrucibleEntity):
 
 2. **Pydantic and `readonly_field`**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(readonly_field,))` to your model.
 
-3. **Forward references in relationships**: Use lambdas to avoid circular import issues: `relationship(lambda: OtherEntity.__sqlalchemy_type__)`.
+3. **Forward references in relationships**: Use lambdas to avoid circular import issues: `relationship(lambda: SAType[OtherEntity])`.
 
 4. **Concrete table inheritance** requires redefining ALL columns in each subclass.
 
