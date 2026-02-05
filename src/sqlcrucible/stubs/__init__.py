@@ -21,7 +21,7 @@ from typing_extensions import get_annotations
 from sqlcrucible.entity.core import SQLCrucibleEntity
 
 
-@dataclass
+@dataclass(slots=True)
 class TypeDef:
     """Represents a type definition with its required imports."""
 
@@ -29,7 +29,7 @@ class TypeDef:
     type_def: str
 
 
-@dataclass
+@dataclass(slots=True)
 class ClassDef:
     """Represents a class definition with its required imports."""
 

@@ -18,7 +18,7 @@ from sqlcrucible.entity.annotations import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AnnotationMetadata:
     """Metadata extracted from Annotated[] type arguments.
 
@@ -86,7 +86,7 @@ def _extract_annotation_metadata(annotations: tuple[Any, ...]) -> AnnotationMeta
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CanonicalisedTypeform:
     """Normalized representation of a type annotation.
 
@@ -101,7 +101,7 @@ class CanonicalisedTypeform:
     should_exclude: bool | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SQLAlchemyFieldDefinition:
     """Complete specification for mapping an entity field to SQLAlchemy.
 

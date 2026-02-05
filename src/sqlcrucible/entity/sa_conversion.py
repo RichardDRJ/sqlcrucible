@@ -1,7 +1,5 @@
-from sqlcrucible.utils.types.equivalence import (
-    types_are_non_parameterised_and_equal,
-    strip_wrappers,
-)
+from sqlcrucible.utils.types.annotations import unwrap
+from sqlcrucible.utils.types.equivalence import types_are_non_parameterised_and_equal
 from typing import Any, TYPE_CHECKING
 
 
@@ -31,12 +29,15 @@ class ToSAModelConverter(Converter[_E, Any]):
     def convert(self, source: _E) -> Any:
         return source.to_sa_model()
 
+    def safe_convert(self, source: _E) -> Any:
+        return self.convert(source)
+
 
 class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         from sqlcrucible.entity.core import SQLCrucibleEntity
 
-        stripped_source = strip_wrappers(source_tp)
+        stripped_source = unwrap(source_tp)
         if not isinstance(stripped_source, type):
             return False
 
@@ -47,7 +48,7 @@ class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return ToSAModelConverter(strip_wrappers(source_tp))
+        return ToSAModelConverter(unwrap(source_tp))
 
 
 class FromSAModelConverter(Converter[_E, Any]):
@@ -66,12 +67,15 @@ class FromSAModelConverter(Converter[_E, Any]):
     def convert(self, source: _E) -> Any:
         return self._sqlcrucible_entity.from_sa_model(source)
 
+    def safe_convert(self, source: _E) -> Any:
+        return self.convert(source)
+
 
 class FromSAModelConverterFactory(ConverterFactory[Any, Any]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         from sqlcrucible.entity.core import SQLCrucibleEntity
 
-        stripped_target = strip_wrappers(target_tp)
+        stripped_target = unwrap(target_tp)
         if not isinstance(stripped_target, type):
             return False
 
@@ -82,4 +86,4 @@ class FromSAModelConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return FromSAModelConverter(strip_wrappers(target_tp))
+        return FromSAModelConverter(unwrap(target_tp))
