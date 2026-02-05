@@ -28,6 +28,7 @@ theme:
 
 plugins:
   - search
+  - mike
   - mkdocstrings:
       handlers:
         python:
