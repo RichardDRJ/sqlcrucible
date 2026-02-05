@@ -10,13 +10,11 @@ Uses registry-based value conversion. Keys are assumed compatible - no key
 conversion is performed. If key types are incompatible, the factory returns None.
 """
 
-import builtins
 from dataclasses import dataclass
 from typing import (
     Any,
     Required,
     NotRequired,
-    get_origin,
     get_args,
     get_type_hints,
     Self,
@@ -180,10 +178,7 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
         source_origin = getattr(source_stripped, "__origin__", source_stripped)
         target_origin = getattr(target_stripped, "__origin__", target_stripped)
 
-        # Source is dict-like if it's Any or a dict subclass
-        source_is_dict = source_stripped is Any or (
-            isinstance(source_origin, type) and issubclass(source_origin, dict)
-        )
+        source_is_dict = isinstance(source_origin, type) and issubclass(source_origin, dict)
         target_is_dict = isinstance(target_origin, type) and issubclass(target_origin, dict)
 
         return source_is_dict and target_is_dict
@@ -193,10 +188,6 @@ class DictConverterFactory(ConverterFactory[dict, dict]):
     ) -> Converter[Any, Any] | None:
         source_stripped = unwrap(source_tp)
         target_stripped = unwrap(target_tp)
-
-        # Handle Any source type as unparameterized dict
-        if source_stripped is Any:
-            source_stripped = dict
 
         source_info = DictInfo.create(source_stripped)
         target_info = DictInfo.create(target_stripped)
