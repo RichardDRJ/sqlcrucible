@@ -5,13 +5,20 @@ on:
     tags: ["*"]
   workflow_dispatch:
     inputs:
+      action:
+        description: "Action to perform"
+        type: choice
+        options:
+          - deploy
+          - delete
+        default: deploy
       version:
-        description: "Version to deploy (e.g., 0.1.0)"
+        description: "Version to deploy or delete (e.g., 0.1.0, pr-123)"
         required: true
       latest:
-        description: "Update 'latest' alias"
+        description: "Update 'latest' alias (deploy only)"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -21,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,16 +43,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Deploy docs
+      - name: Deploy or delete docs
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
-            if [ "${{ github.event.inputs.latest }}" = "true" ]; then
+            if [ "${{ github.event.inputs.action }}" = "delete" ]; then
+              uv run --group docs mike delete --push "$VERSION"
+            elif [ "${{ github.event.inputs.latest }}" = "true" ]; then
               uv run --group docs mike deploy --push --update-aliases "$VERSION" latest
+              uv run --group docs mike set-default --push latest
             else
               uv run --group docs mike deploy --push "$VERSION"
             fi
           else
             VERSION="${GITHUB_REF#refs/tags/}"
             uv run --group docs mike deploy --push --update-aliases "$VERSION" latest
+            uv run --group docs mike set-default --push latest
           fi
