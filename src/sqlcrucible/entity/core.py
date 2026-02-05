@@ -154,6 +154,9 @@ class SQLCrucibleEntity:
             origin = get_origin(ann)
             if origin is ClassVar or origin is Final or ann is ClassVar or ann is Final:
                 continue
+            # Skip fields with readonly_field descriptor - they handle their own registration
+            if isinstance(cls.__dict__.get(key), readonly_field):
+                continue
             if (field_definition := SQLAlchemyFieldDefinition.from_typeform(key, ann)) is not None:
                 cls.__register_sqlalchemy_field_definition__(field_definition)
 
@@ -197,6 +200,8 @@ class SQLCrucibleEntity:
                     converter=get_to_sa_model_converter(cls, it),
                 )
                 for it in cls.__mapped_fields__()
+                # Exclude readonly fields (defined via readonly_field descriptor)
+                if not it.readonly
             ],
         ]
 
@@ -217,6 +222,8 @@ class SQLCrucibleEntity:
                     converter=get_from_sa_model_converter(cls, it),
                 )
                 for it in cls.__mapped_fields__()
+                # Exclude readonly fields (defined via readonly_field descriptor)
+                if not it.readonly
             ],
         ]
 

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import ORMDescriptor
 
 from sqlcrucible.conversion.function import FunctionConverter
 from sqlcrucible.conversion.registry import Converter
@@ -21,12 +21,12 @@ class SQLAlchemyField:
 
     Attributes:
         name: The name to use for the mapped attribute (defaults to field name)
-        attr: A Mapped[] attribute to use directly
+        attr: An ORM descriptor to use directly (e.g., hybrid_property, association_proxy)
         tp: The type to use for the mapped attribute
     """
 
     name: str | None = None
-    attr: Mapped[Any] | None = None
+    attr: ORMDescriptor[Any] | None = None
     tp: Any | None = None
 
     @classmethod

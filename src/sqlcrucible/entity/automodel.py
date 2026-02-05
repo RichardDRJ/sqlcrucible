@@ -78,14 +78,28 @@ def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     base = _get_sa_base(source)
 
     field_defs = source.__sqlalchemy_field_definitions__().values()
+
+    # Determine which fields need type annotations based on SQLAlchemy's Mapped type.
+    # Mapped represents attributes instrumented by the Mapper (columns, relationships),
+    # which require annotations for SQLAlchemy to configure them. Non-Mapped descriptors
+    # like hybrid_property and association_proxy are extensions that provide their own
+    # functionality without mapper instrumentation, so they only need class attributes.
+    def needs_annotation(f: SQLAlchemyFieldDefinition) -> bool:
+        return f.mapped_attr is None or isinstance(f.mapped_attr, Mapped)
+
+    annotated_field_defs = [f for f in field_defs if needs_annotation(f)]
+
+    # All fields with mapped_attr become class attributes (mapped_column, relationship, etc.)
     field_defaults = {
-        field_def.mapped_name: default
-        for field_def in field_defs
-        if (default := field_def.mapped_attr) is not None
+        f.mapped_name: f.mapped_attr
+        for f in field_defs
+        if f.mapped_attr is not None
     }
 
+    # Transform field types for annotations (columns and relationships, but not computed descriptors)
     field_transform_results = {
-        field_def.mapped_name: _transform_field_type(source, field_def) for field_def in field_defs
+        field_def.mapped_name: _transform_field_type(source, field_def)
+        for field_def in annotated_field_defs
     }
 
     annotations = {key: it.result for key, it in field_transform_results.items()}

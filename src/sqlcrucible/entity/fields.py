@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload, Self
+from dataclasses import replace
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload, Self, get_origin, get_args, Annotated
+
+from sqlalchemy.orm import ORMDescriptor
 
 import sqlcrucible.entity.field_resolution
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
 from sqlcrucible.utils.types.forward_refs import resolve_forward_refs
+from typing_extensions import get_annotations, Format
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.core import SQLCrucibleEntity
@@ -72,13 +76,40 @@ class readonly_field(Generic[_T, _O]):
         """
         self._name = name
         self._owner = owner
+
+        # Extract ORMDescriptor from annotation if no explicit sa_field was provided
+        sa_field = self._sa_field
+        if sa_field is None:
+            sa_field = self._extract_sa_field_from_annotation(owner, name)
+
         # Register a preliminary field definition without resolving forward refs yet.
         # The type will contain unresolved forward refs, but that's OK - they'll be
         # resolved when the automodel is generated (lazily) or when the field is accessed.
         sa_field_info = SQLAlchemyFieldDefinition.from_sqlalchemy_field(
-            self._name, self._tp, self._sa_field
+            self._name, self._tp, sa_field
         )
+        # Mark as readonly so it's excluded from to/from SA model converters
+        sa_field_info = replace(sa_field_info, readonly=True)
         owner.__register_sqlalchemy_field_definition__(sa_field_info)
+
+    def _extract_sa_field_from_annotation(
+        self, owner: type[_O], name: str
+    ) -> SQLAlchemyField | None:
+        """Extract SQLAlchemyField from the annotation if it contains an ORMDescriptor.
+
+        This handles the case where readonly_field is used with an annotated type
+        like `Annotated[str, hybrid_property(...)]` without an explicit SQLAlchemyField.
+        """
+        annotations = get_annotations(owner, eval_str=True, format=Format.VALUE)
+        ann = annotations.get(name)
+        if ann is None or get_origin(ann) is not Annotated:
+            return None
+
+        _, *metadata = get_args(ann)
+        descriptor = next(
+            (arg for arg in metadata if isinstance(arg, ORMDescriptor)), None
+        )
+        return SQLAlchemyField(attr=descriptor) if descriptor else None
 
     @property
     def sa_field_info(self) -> SQLAlchemyFieldDefinition:

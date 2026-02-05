@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Annotated, Any, Self, get_args, get_origin
 
 import sqlalchemy.orm
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import ORMDescriptor
 
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import (
@@ -64,8 +64,9 @@ def _extract_annotation_metadata(annotations: tuple[Any, ...]) -> AnnotationMeta
     for arg in annotations:
         if isinstance(arg, SQLAlchemyField):
             fields.append(arg)
-        elif isinstance(arg, Mapped):
-            # Mapped[T] in annotations becomes an attr override
+        elif isinstance(arg, ORMDescriptor):
+            # ORM descriptors (mapped_column, relationship, hybrid_property, etc.)
+            # in annotations become class attributes on the SA model
             fields.append(SQLAlchemyField(attr=arg))
         elif isinstance(arg, ConvertFromSAWith):
             from_sa_converter = arg.converter
@@ -114,9 +115,10 @@ class SQLAlchemyFieldDefinition:
         source_tp: Type of the field in the entity class
         mapped_name: Name of the attribute in the SQLAlchemy model
         mapped_tp: Type of the attribute in the SQLAlchemy model (if specified)
-        mapped_attr: Mapped[] attribute instance (if specified)
+        mapped_attr: ORM descriptor instance (if specified), e.g. hybrid_property
         from_sa_converter: Custom converter from SA to entity (if specified)
         to_sa_converter: Custom converter from entity to SA (if specified)
+        readonly: Whether this field is read-only (not included in converters)
     """
 
     source_name: str
@@ -125,10 +127,12 @@ class SQLAlchemyFieldDefinition:
     mapped_name: str
     mapped_tp: Any | None = None
 
-    mapped_attr: Mapped[Any] | None = None
+    mapped_attr: ORMDescriptor[Any] | None = None
 
     from_sa_converter: Converter | None = None
     to_sa_converter: Converter | None = None
+
+    readonly: bool = False
 
     @classmethod
     def from_sqlalchemy_field(
