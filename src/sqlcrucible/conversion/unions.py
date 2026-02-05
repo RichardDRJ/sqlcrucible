@@ -15,7 +15,6 @@ Example:
     - For a bool value: finds int in MRO, tries int -> str
 """
 
-from collections import defaultdict
 from collections.abc import Sequence
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
@@ -23,7 +22,12 @@ from typing import Any, Union, get_args, get_origin
 from sqlcrucible.conversion.exceptions import ConversionError, NoConverterFoundError
 from sqlcrucible.conversion.noop import NoOpConverter
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
+from sqlcrucible.utils.collections import group_pairs
 from sqlcrucible.utils.types.annotations import unwrap
+
+
+class _IncompatibleUnion(Exception):
+    """Raised internally when union members cannot all be converted."""
 
 
 def _is_union(tp: Any) -> bool:
@@ -94,17 +98,12 @@ class UnionConverter(Converter[Any, Any]):
 
     def convert(self, source: Any) -> Any:
         source_type = type(source)
-        candidates: list[Converter[Any, Any]] = []
+        candidates = [
+            conv
+            for origin in source_type.__mro__
+            for conv in self._converters_by_origin.get(origin, [])
+        ] + self._any_converters
 
-        # Find converters whose source origin is in the value's MRO
-        for origin in source_type.__mro__:
-            if origin in self._converters_by_origin:
-                candidates.extend(self._converters_by_origin[origin])
-
-        # Always include Any converters
-        candidates.extend(self._any_converters)
-
-        # Try candidates using safe_convert
         for converter in candidates:
             try:
                 return converter.safe_convert(source)
@@ -153,31 +152,43 @@ class UnionConverterFactory(ConverterFactory[Any, Any]):
         if set(source_members) <= set(target_members):
             return NoOpConverter(Any)
 
-        # Build converters grouped by source origin
-        converters_by_origin: dict[type, list[Converter[Any, Any]]] = defaultdict(list)
-        any_converters: list[Converter[Any, Any]] = []
+        # Resolve all member converters
+        try:
+            origin_converters = [
+                self._resolve_member(sm, target_members, registry) for sm in source_members
+            ]
+        except _IncompatibleUnion:
+            return None
 
-        for source_member in source_members:
-            conv = self._best_converter(source_member, target_members, registry)
-            if conv is None:
-                return None
+        # Partition by origin type
+        any_converters = sorted(
+            [conv for origin, conv in origin_converters if origin is Any or origin is object],
+            key=lambda c: 0 if isinstance(c, NoOpConverter) else 1,
+        )
 
-            origin = _get_source_origin(source_member)
-
-            # Any/object origins go in any_converters (tried for all values)
-            if origin is Any or origin is object:
-                any_converters.append(conv)
-            else:
-                converters_by_origin[origin].append(conv)
+        converters_by_origin: dict[type, list[Converter[Any, Any]]] = group_pairs(
+            (origin, conv)
+            for origin, conv in origin_converters
+            if origin is not Any and origin is not object
+        )
 
         # Sort each origin group to prefer NoOpConverters
-        for origin in converters_by_origin:
-            converters_by_origin[origin].sort(
-                key=lambda c: 0 if isinstance(c, NoOpConverter) else 1
-            )
-        any_converters.sort(key=lambda c: 0 if isinstance(c, NoOpConverter) else 1)
+        for convs in converters_by_origin.values():
+            convs.sort(key=lambda c: 0 if isinstance(c, NoOpConverter) else 1)
 
-        return UnionConverter(target_tp, dict(converters_by_origin), any_converters)
+        return UnionConverter(target_tp, converters_by_origin, any_converters)
+
+    def _resolve_member(
+        self,
+        source_member: Any,
+        target_members: Sequence[Any],
+        registry: ConverterRegistry,
+    ) -> tuple[type, Converter[Any, Any]]:
+        """Resolve a source member to (origin, converter). Raises _IncompatibleUnion on failure."""
+        conv = self._best_converter(source_member, target_members, registry)
+        if conv is None:
+            raise _IncompatibleUnion()
+        return (_get_source_origin(source_member), conv)
 
     def _best_converter(
         self, source_tp: Any, target_tps: Sequence[Any], registry: ConverterRegistry
