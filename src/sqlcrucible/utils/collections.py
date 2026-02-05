@@ -3,11 +3,11 @@
 from functools import reduce
 from typing import Iterable, TypeVar
 
-K = TypeVar("K")
-V = TypeVar("V")
+_K = TypeVar("_K")
+_V = TypeVar("_V")
 
 
-def group_pairs(pairs: Iterable[tuple[K, V]]) -> dict[K, list[V]]:
+def group_pairs(pairs: Iterable[tuple[_K, _V]]) -> dict[_K, list[_V]]:
     """Group (key, value) pairs into a dict of lists by key.
 
     Args:
@@ -21,7 +21,7 @@ def group_pairs(pairs: Iterable[tuple[K, V]]) -> dict[K, list[V]]:
         {'a': [1, 3], 'b': [2]}
     """
 
-    def accumulate(groups: dict[K, list[V]], pair: tuple[K, V]) -> dict[K, list[V]]:
+    def accumulate(groups: dict[_K, list[_V]], pair: tuple[_K, _V]) -> dict[_K, list[_V]]:
         key, value = pair
         groups.setdefault(key, []).append(value)
         return groups
