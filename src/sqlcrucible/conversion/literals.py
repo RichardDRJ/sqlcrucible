@@ -14,7 +14,7 @@ from typing import Any, Literal, get_args, get_origin
 
 from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.annotations import unwrap
+from sqlcrucible._types.annotations import unwrap
 
 
 def _is_literal(tp: Any) -> bool:

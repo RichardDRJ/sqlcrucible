@@ -17,7 +17,7 @@ Example:
 from typing import Any, Sequence, get_args, get_origin
 
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.params import get_type_params_for_base
+from sqlcrucible._types.params import get_type_params_for_base
 
 #: Union of supported sequence types for conversion
 KnownSequenceType = list | set | frozenset

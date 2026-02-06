@@ -108,8 +108,8 @@
     ```python
     from sqlalchemy.orm import relationship
     from sqlcrucible import SAType
-    from sqlcrucible.entity.fields import readonly_field
-    from sqlcrucible.entity.annotations import SQLAlchemyField
+    from sqlcrucible import readonly_field
+    from sqlcrucible import SQLAlchemyField
 
     class Author(SQLCrucibleBaseModel):
         __sqlalchemy_params__ = {"__tablename__": "author"}
@@ -143,7 +143,7 @@
 
     ```python
     from sqlalchemy.ext.hybrid import hybrid_property
-    from sqlcrucible.entity.fields import readonly_field
+    from sqlcrucible import readonly_field
 
     def _full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"

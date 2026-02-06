@@ -10,7 +10,7 @@ from sqlalchemy import MetaData, String, ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible.entity.descriptors import readonly_field
 
 
 class StubTestBase(SQLCrucibleBaseModel):

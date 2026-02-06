@@ -60,7 +60,7 @@
 
 ### readonly_field
 
-::: sqlcrucible.entity.fields.readonly_field
+::: sqlcrucible.entity.descriptors.readonly_field
     options:
       show_bases: false
 
@@ -68,6 +68,6 @@
 
 ### lazyproperty
 
-::: sqlcrucible.utils.properties.lazyproperty
+::: sqlcrucible.entity.core.lazyproperty
     options:
       show_bases: false

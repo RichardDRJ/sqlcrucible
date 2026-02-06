@@ -9,9 +9,9 @@ import sqlalchemy.orm
 from sqlalchemy.orm.attributes import Mapped
 
 from sqlcrucible.entity.core import SQLAlchemyBase, SQLCrucibleEntity
-from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
-from sqlcrucible.utils.types.forward_refs import resolve_forward_refs
-from sqlcrucible.utils.types.transformer import (
+from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+from sqlcrucible._types.forward_refs import resolve_forward_refs
+from sqlcrucible._types.transformer import (
     TypeTransformerChain,
     TypeTransformer,
     TypeTransformerResult,

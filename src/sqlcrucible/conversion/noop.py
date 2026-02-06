@@ -8,8 +8,8 @@ The NoOpConverter still performs runtime type validation to catch mismatches
 early rather than allowing invalid values to propagate through the system.
 """
 
-from sqlcrucible.utils.types.annotations import unwrap
-from sqlcrucible.utils.types.equivalence import (
+from sqlcrucible._types.annotations import (
+    unwrap,
     types_are_non_parameterised_and_equal,
     types_are_noop_compatible,
 )

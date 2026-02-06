@@ -9,7 +9,7 @@ from sqlcrucible.entity.annotations import (
     ConvertToSAWith,
     ConvertFromSAWith,
 )
-from sqlcrucible.entity.fields import ReadonlyFieldDescriptor, readonly_field
+from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor, readonly_field
 
 from datetime import timedelta
 

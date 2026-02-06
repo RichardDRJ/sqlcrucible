@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 import pytest
 
-from sqlcrucible.utils.types.params import get_type_params_for_base
+from sqlcrucible._types.params import get_type_params_for_base
 
 
 @pytest.mark.parametrize(

@@ -22,7 +22,7 @@ from typing import (
 from typing_extensions import is_typeddict, NoExtraItems
 
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
-from sqlcrucible.utils.types.annotations import TypeAnnotation, unwrap
+from sqlcrucible._types.annotations import TypeAnnotation, unwrap
 
 
 class _IncompatibleTypes(Exception):
