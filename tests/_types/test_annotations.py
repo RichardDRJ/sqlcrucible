@@ -4,7 +4,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy.orm import Mapped
 
-from sqlcrucible.utils.types.annotations import TypeAnnotation, unwrap
+from sqlcrucible._types.annotations import TypeAnnotation, unwrap
 
 
 @pytest.mark.parametrize(

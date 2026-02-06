@@ -9,7 +9,7 @@ from datetime import timedelta
 from typing import Annotated
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import ConvertFromSAWith, ConvertToSAWith, SQLAlchemyField
+from sqlcrucible import ConvertFromSAWith, ConvertToSAWith, SQLAlchemyField
 
 class Track(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "track"}

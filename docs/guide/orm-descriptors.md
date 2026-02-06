@@ -17,7 +17,7 @@ from pydantic import Field
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible import readonly_field
 
 def _full_name(self) -> str:
     return f"{self.first_name} {self.last_name}"
@@ -73,7 +73,7 @@ class Person(SQLCrucibleBaseModel):
 For advanced cases (e.g., custom mapped name), you can pass both a descriptor and `SQLAlchemyField`:
 
 ```python
-from sqlcrucible.entity.annotations import SQLAlchemyField
+from sqlcrucible import SQLAlchemyField
 
 # Order doesn't matter - both are equivalent
 full_name = readonly_field(str, hybrid_property(_full_name), SQLAlchemyField(name="custom_name"))
@@ -120,7 +120,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlcrucible import SAType
-from sqlcrucible.entity.annotations import SQLAlchemyField
+from sqlcrucible import SQLAlchemyField
 
 class Department(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "department"}

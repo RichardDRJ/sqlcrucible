@@ -14,7 +14,7 @@ from sqlcrucible.entity.annotations import (
     ExcludeSAField,
     SQLAlchemyField,
 )
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible.entity.descriptors import readonly_field
 
 
 class BaseTestEntity(SQLCrucibleEntity):

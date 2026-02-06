@@ -21,8 +21,8 @@ from sqlalchemy.orm import ORMDescriptor
 import sqlcrucible.entity.field_resolution
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import SQLAlchemyField
-from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
-from sqlcrucible.utils.types.forward_refs import resolve_forward_refs
+from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+from sqlcrucible._types.forward_refs import resolve_forward_refs
 from typing_extensions import get_annotations, Format
 
 if TYPE_CHECKING:

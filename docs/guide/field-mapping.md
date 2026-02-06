@@ -12,7 +12,7 @@ Use `ExcludeSAField` to exclude a field from the SQLAlchemy model while keeping 
 from typing import Annotated
 from pydantic import Field
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import ExcludeSAField
+from sqlcrucible import ExcludeSAField
 
 class Dog(Animal):
     __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "dog"}}
@@ -49,7 +49,7 @@ from uuid import UUID, uuid4
 from pydantic import Field
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import SQLAlchemyField
+from sqlcrucible import SQLAlchemyField
 
 class User(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "user"}
@@ -66,7 +66,7 @@ from datetime import timedelta
 from typing import Annotated
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import SQLAlchemyField
+from sqlcrucible import SQLAlchemyField
 
 class Task(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "task"}

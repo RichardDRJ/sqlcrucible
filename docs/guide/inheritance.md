@@ -13,7 +13,7 @@ from pydantic import Field
 from sqlalchemy import String
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import ExcludeSAField
+from sqlcrucible import ExcludeSAField
 
 class Animal(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {
@@ -47,7 +47,7 @@ from pydantic import Field
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
-from sqlcrucible.entity.annotations import ExcludeSAField
+from sqlcrucible import ExcludeSAField
 
 class Animal(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {

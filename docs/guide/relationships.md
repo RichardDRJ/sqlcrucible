@@ -11,7 +11,7 @@ from pydantic import Field
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
 from sqlcrucible import SQLCrucibleBaseModel, SAType
-from sqlcrucible.entity.fields import readonly_field
+from sqlcrucible import readonly_field
 
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
@@ -68,7 +68,7 @@ artist = readonly_field(
 
 - **Cyclical references are not supported.** If `Artist` has a `tracks` relationship and `Track` has an `artist` relationship, use `readonly_field` on at least one side to break the cycle.
 
-- **Pydantic compatibility**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible.entity.fields`).
+- **Pydantic compatibility**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible`).
 
 - **Accessing without a backing model**: Accessing a `readonly_field` on an entity not loaded via `from_sa_model()` raises `RuntimeError`.
 

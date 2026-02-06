@@ -10,8 +10,7 @@ from sqlalchemy import MetaData
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import mapped_column
 
-from sqlcrucible.entity.core import SQLCrucibleBaseModel
-from sqlcrucible.utils.properties import lazyproperty
+from sqlcrucible.entity.core import SQLCrucibleBaseModel, lazyproperty
 
 
 class BaseTestEntity(SQLCrucibleBaseModel):

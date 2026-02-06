@@ -1,10 +1,23 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
-from sqlcrucible.utils.types.match import mro_distance
+from sqlcrucible._types.match import mro_distance
 
 from functools import cache
 from logging import getLogger
-from typing import Any, ClassVar, Final, Literal, Self, TYPE_CHECKING, get_origin
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Final,
+    Generic,
+    Literal,
+    ParamSpec,
+    Self,
+    TYPE_CHECKING,
+    TypeVar,
+    cast,
+    get_origin,
+)
 
 from sqlalchemy import MetaData, Table
 from sqlalchemy.orm import DeclarativeBase
@@ -22,11 +35,49 @@ from sqlcrucible.entity.field_resolution import (
     get_from_sa_model_converter,
     get_to_sa_model_converter,
 )
-from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
-from sqlcrucible.entity.fields import ReadonlyFieldDescriptor
-from sqlcrucible.utils.properties import (
-    lazyproperty,
-)
+from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor
+
+
+# --- Lazy property descriptors ---
+
+_LP_T = TypeVar("_LP_T")
+_LP_R = TypeVar("_LP_R")
+_LP_P = ParamSpec("_LP_P")
+
+UNSET = cast(Any, object())
+
+
+class _lazyproperty(Generic[_LP_T, _LP_R]):
+    """Descriptor that lazily computes a value once and caches it.
+
+    Used for class-level properties that are expensive to compute and
+    should only be computed once.
+    """
+
+    def __init__(self, func: Callable[[type[_LP_T]], _LP_R]) -> None:
+        self._func = func
+        self._value: _LP_R = UNSET
+
+    def __get__(self, instance: Any, owner: type[_LP_T]) -> _LP_R:
+        if self._value is UNSET:
+            self._value = self._func(owner)
+        return self._value
+
+
+def lazyproperty(func: Callable[[type[_LP_T]], _LP_R]) -> _LP_R:
+    return cast(_LP_R, _lazyproperty(func))
+
+
+class lazymethod(Generic[_LP_T, _LP_P, _LP_R]):
+    """Descriptor that lazily defines a method on a class."""
+
+    def __init__(self, supplier: Callable[[type[_LP_T]], Callable[_LP_P, _LP_R]]) -> None:
+        self._supplier = supplier
+
+    def __call__(self, wrapped: Callable[_LP_P, _LP_R]) -> Callable[_LP_P, _LP_R]:
+        return cast(Callable[_LP_P, _LP_R], lazyproperty(self._supplier))
+
 
 if TYPE_CHECKING:
     pass

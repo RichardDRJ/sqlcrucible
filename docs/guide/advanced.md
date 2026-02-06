@@ -7,7 +7,7 @@ For most use cases, SQLCrucible's built-in support for ORM descriptors is suffic
 For advanced customization beyond what's covered there, you can override `__sqlalchemy_type__` with a `lazyproperty`:
 
 ```python
-from sqlcrucible.utils.properties import lazyproperty
+from sqlcrucible.entity.core import lazyproperty
 from sqlcrucible import SQLCrucibleEntity
 
 def user_sqlalchemy_type(cls: type["User"]):

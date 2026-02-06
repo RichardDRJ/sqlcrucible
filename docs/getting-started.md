@@ -115,7 +115,7 @@ class Artist(SQLCrucibleEntity):
 
 1. **Cyclical references between model instances are not supported.** Use `readonly_field` on one side to break the cycle.
 
-2. **Pydantic and `readonly_field`**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible.entity.fields`).
+2. **Pydantic and `readonly_field`**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible`).
 
 3. **Forward references in relationships**: Use lambdas to avoid circular import issues: `relationship(lambda: SAType[OtherEntity])`.
 

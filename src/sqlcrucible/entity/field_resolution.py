@@ -1,5 +1,4 @@
 from __future__ import annotations
-from types import UnionType
 
 from dataclasses import dataclass
 from typing import (
@@ -8,10 +7,6 @@ from typing import (
     TypeVar,
     cast,
     TYPE_CHECKING,
-    ForwardRef,
-    get_origin,
-    get_args,
-    Union,
 )
 
 from sqlalchemy import inspect
@@ -22,13 +17,14 @@ from sqlalchemy.orm import (
     CompositeProperty,
     Mapper,
 )
-from typing_extensions import get_annotations, Format, evaluate_forward_ref
+from typing_extensions import get_annotations, Format
 
 from sqlcrucible.conversion.registry import Converter
-from sqlcrucible.utils.types.annotations import unwrap
+from sqlcrucible._types.annotations import unwrap
+from sqlcrucible._types.forward_refs import evaluate_forward_refs
 
 if TYPE_CHECKING:
-    from sqlcrucible.entity.field_metadata import SQLAlchemyFieldDefinition
+    from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
     from sqlcrucible.entity.core import SQLCrucibleEntity
 
 _T = TypeVar("_T")
@@ -85,7 +81,7 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
 
     annotations = get_annotations(sqlalchemy_type, eval_str=True, format=Format.VALUE)
     if (annotation := annotations.get(field_def.mapped_name)) is not None:
-        evaluated = _recursively_evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
+        evaluated = evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
         # Strip Mapped[] wrapper since converters work with the inner type
         return unwrap(evaluated)
 
@@ -113,26 +109,3 @@ def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> A
                 f"Hint: Use SQLAlchemyField(tp=...) to explicitly specify the mapped type:\n"
                 f"    {field_def.source_name}: Annotated[..., SQLAlchemyField(tp=YourType)]"
             )
-
-
-def _recursively_evaluate_forward_refs(tp: Any, owner: type[object]) -> Any:
-    # Handle string forward references (e.g., "Profile" or "Profile.__sqlalchemy_type__")
-    if isinstance(tp, str):
-        forward_ref = ForwardRef(tp)
-        return evaluate_forward_ref(forward_ref, owner=owner)
-
-    if isinstance(tp, ForwardRef):
-        return evaluate_forward_ref(tp, owner=owner)
-
-    origin = get_origin(tp)
-    args = get_args(tp)
-
-    if origin is None:
-        return tp
-
-    evaluated_args = tuple(_recursively_evaluate_forward_refs(arg, owner) for arg in args)
-
-    # `UnionType` can't be subscripted - we need to use `Union` instead
-    if origin is UnionType:
-        origin = Union
-    return origin[evaluated_args] if evaluated_args else tp

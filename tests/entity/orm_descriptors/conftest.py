@@ -35,7 +35,7 @@ from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
-from sqlcrucible.entity.fields import ReadonlyFieldDescriptor, readonly_field
+from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor, readonly_field
 from sqlcrucible.entity.sa_type import SAType
 
 

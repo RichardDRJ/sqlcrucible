@@ -2,7 +2,7 @@
 
 import pytest
 
-from sqlcrucible.utils.types.forward_refs import resolve_forward_refs
+from sqlcrucible._types.forward_refs import resolve_forward_refs
 
 
 class Target:

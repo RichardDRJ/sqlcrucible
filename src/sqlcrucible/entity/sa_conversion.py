@@ -1,5 +1,4 @@
-from sqlcrucible.utils.types.annotations import unwrap
-from sqlcrucible.utils.types.equivalence import types_are_non_parameterised_and_equal
+from sqlcrucible._types.annotations import unwrap, types_are_non_parameterised_and_equal
 from typing import Any, TYPE_CHECKING
 
 
