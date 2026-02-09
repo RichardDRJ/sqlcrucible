@@ -39,6 +39,23 @@ class Dog(Animal):
     type: Annotated[str, ExcludeSAField()] = Field(default="dog")
 
 
+class StubAbstractParent(StubTestBase):
+    """Abstract entity with a field inherited by concrete children."""
+
+    __sqlalchemy_params__ = {"__abstract__": True}
+
+    shared_name: Annotated[str, mapped_column()]
+
+
+class StubConcreteChild(StubAbstractParent):
+    """Concrete entity that inherits shared_name from its abstract parent."""
+
+    __sqlalchemy_params__ = {"__tablename__": "stub_concrete_child"}
+
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    own_field: Annotated[int, mapped_column()]
+
+
 class SimpleTrack(StubTestBase):
     """Simple track entity for basic stub testing."""
 

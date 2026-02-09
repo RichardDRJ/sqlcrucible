@@ -108,7 +108,7 @@ def construct_model_def(sqlalchemy_type: type) -> ClassDef:
     )
 
 
-def subclass_first(entities: list[type[SQLCrucibleEntity]]) -> list[type[SQLCrucibleEntity]]:
+def specificity_order(entities: list[type[SQLCrucibleEntity]]) -> list[type[SQLCrucibleEntity]]:
     """Sort entities so subclasses appear before parent classes.
 
     Type checkers match the first applicable overload, so more-specific
@@ -142,7 +142,7 @@ def construct_sa_type_stub(entities: list[type[SQLCrucibleEntity]]) -> str:
     """
     imports: set[str] = set()
     overloads: list[str] = []
-    for entity in subclass_first(entities):
+    for entity in specificity_order(entities):
         sa_type = entity.__sqlalchemy_type__
         imports.add(entity.__module__)
         imports.add(sa_type.__module__)

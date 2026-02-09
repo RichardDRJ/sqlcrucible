@@ -52,3 +52,23 @@ def test_satype_in_select_statement(checker, stub_dir):
     """)
     returncode, output = run_typechecker(checker, code, stub_dir)
     assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_satype_resolves_abstract_entity(checker, stub_dir):
+    """SAType[AbstractEntity] resolves fields defined on the abstract base."""
+    code = dedent("""\
+    from typing import assert_type, TypeVar
+    from tests.stubs.sample_models import StubAbstractParent
+    from sqlcrucible.entity.sa_type import SAType
+
+    T = TypeVar("T")
+    def cast_to(cls: type[T], obj: object) -> T:
+        return obj  # type: ignore
+
+    sa_entity = cast_to(SAType[StubAbstractParent], object())
+
+    assert_type(sa_entity.shared_name, str)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"

@@ -14,7 +14,7 @@ from sqlcrucible.stubs.codegen import (
     build_import_block,
     construct_sa_type_stub,
     generate_model_defs_for_entity,
-    subclass_first,
+    specificity_order,
 )
 from sqlcrucible.stubs.discovery import get_entities_from_module
 
@@ -136,7 +136,7 @@ def generate_stubs(
 
     # Expand to include base classes (SQLCrucibleBaseModel, etc.) that
     # will appear in SAType overloads, so their automodel stubs are generated too.
-    all_with_bases = subclass_first(all_entities)
+    all_with_bases = specificity_order(all_entities)
 
     # Force automodel creation for all entities before generating stubs.
     # This populates the shared MetaData with all tables, allowing SQLAlchemy

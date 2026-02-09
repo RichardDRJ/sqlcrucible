@@ -67,3 +67,26 @@ def test_inheritance_columns_accessible(checker, stub_dir):
     """)
     returncode, output = run_typechecker(checker, code, stub_dir)
     assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_abstract_parent_columns_accessible_on_concrete_child(checker, stub_dir):
+    """Fields defined on an abstract parent are accessible via SAType on the concrete child."""
+    code = dedent("""\
+    from typing import assert_type, TypeVar
+    from tests.stubs.sample_models import StubConcreteChild
+    from sqlcrucible.entity.sa_type import SAType
+    from uuid import UUID
+
+    T = TypeVar("T")
+    def cast_to(cls: type[T], obj: object) -> T:
+        return obj  # type: ignore
+
+    sa_entity = cast_to(SAType[StubConcreteChild], object())
+
+    assert_type(sa_entity.id, UUID)
+    assert_type(sa_entity.own_field, int)
+    assert_type(sa_entity.shared_name, str)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
