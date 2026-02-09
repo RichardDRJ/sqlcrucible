@@ -9,7 +9,15 @@ import pytest
 
 from sqlcrucible.stubs import generate_stubs
 
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+def _find_project_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "pyproject.toml").exists():
+            return parent
+    raise RuntimeError("Could not find project root (no pyproject.toml found)")
+
+
+_PROJECT_ROOT = _find_project_root()
 
 
 def run_typechecker(
