@@ -5,7 +5,6 @@ Generates type stubs that provide type checker support for SAType[Entity] access
 
 from __future__ import annotations
 
-from functools import reduce
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 
@@ -33,11 +32,10 @@ def _unique_by(iterable: Iterable[_T], key: Callable[[_T], Any]) -> Iterable[_T]
 
 
 def _group_by(iterable: Iterable[_T], key: Callable[[_T], _K]) -> dict[_K, list[_T]]:
-    return reduce(
-        lambda acc, it: {**acc, key(it): [*acc.get(key(it), []), it]},
-        iterable,
-        {},
-    )
+    groups: dict[_K, list[_T]] = {}
+    for it in iterable:
+        groups.setdefault(key(it), []).append(it)
+    return groups
 
 
 def _stub_path(root: Path, module_name: str) -> Path:
@@ -89,7 +87,7 @@ def _write_to_stub_file(classdefs: list[ClassDef], stubs_root: Path, module_name
 def _generate_automodel_stubs(
     entities: list[type[SQLCrucibleEntity]],
     output_dir: Path,
-):
+) -> None:
     all_classdefs = [
         classdef for entity in entities for classdef in generate_model_defs_for_entity(entity)
     ]

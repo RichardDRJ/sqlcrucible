@@ -125,7 +125,9 @@ def subclass_first(entities: list[type[SQLCrucibleEntity]]) -> list[type[SQLCruc
                 it
                 for entity in entities
                 for it in reversed(entity.__mro__)
-                if isinstance(it, type) and issubclass(it, SQLCrucibleEntity)
+                if isinstance(it, type)
+                and issubclass(it, SQLCrucibleEntity)
+                and it is not SQLCrucibleEntity
             )
         )
     )
