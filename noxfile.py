@@ -7,6 +7,7 @@
 import nox
 
 nox.options.default_venv_backend = "uv"
+nox.options.reuse_existing_virtualenvs = True
 
 SUPPORTED_PYTHON_VERSIONS = nox.project.python_versions(nox.project.load_toml("pyproject.toml"))
 MIN_PYTHON_VERSION = SUPPORTED_PYTHON_VERSIONS[0]
