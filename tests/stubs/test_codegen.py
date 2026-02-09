@@ -1,4 +1,4 @@
-"""Tests for stub code generation."""
+"""Tests for SA type overload stub generation."""
 
 from __future__ import annotations
 
@@ -23,11 +23,6 @@ def _entity_order(result: list[type[SQLCrucibleEntity]], entities: list[type]) -
     """Filter result to only the given entity types, preserving order."""
     entity_set = set(entities)
     return [it for it in result if it in entity_set]
-
-
-# =============================================================================
-# _subclass_first tests
-# =============================================================================
 
 
 def test_subclass_first_child_before_parent():
@@ -67,11 +62,6 @@ def test_subclass_first_single_entity():
 def test_subclass_first_no_duplicates():
     result = _subclass_first([Animal, Dog, SimpleTrack])
     assert len(result) == len(set(result))
-
-
-# =============================================================================
-# construct_sa_type_stub tests
-# =============================================================================
 
 
 def _overload_entity_names(stub: str) -> list[str]:
