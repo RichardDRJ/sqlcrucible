@@ -1,7 +1,7 @@
 import pytest
 from uuid import uuid4, UUID
 
-from pydantic import BaseModel, Field, field_validator, computed_field, ConfigDict
+from pydantic import BaseModel, Field, field_validator, computed_field
 
 from sqlcrucible.entity.annotations import (
     ExcludeSAField,
@@ -9,7 +9,7 @@ from sqlcrucible.entity.annotations import (
     ConvertToSAWith,
     ConvertFromSAWith,
 )
-from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor, readonly_field
+from sqlcrucible.entity.descriptors import readonly_field
 
 from datetime import timedelta
 
@@ -27,15 +27,13 @@ class BaseTestEntity(SQLCrucibleBaseModel):
 
 
 class Artist(BaseTestEntity):
-    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
     __sqlalchemy_params__ = {"__tablename__": "artist"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
     name: str
 
 
-class Track(BaseTestEntity, BaseModel):
-    model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))
+class Track(BaseTestEntity):
     __sqlalchemy_params__ = {"__tablename__": "track"}
 
     id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)

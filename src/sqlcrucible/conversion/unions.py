@@ -16,7 +16,6 @@ Example:
 """
 
 from collections.abc import Iterable, Sequence
-from functools import reduce
 from types import UnionType
 from typing import Any, TypeVar, Union, get_args, get_origin
 
@@ -29,13 +28,11 @@ _K = TypeVar("_K")
 _V = TypeVar("_V")
 
 
-def _group_pairs(pairs: Iterable[tuple[_K, _V]]) -> dict[_K, list[_V]]:
-    def accumulate(groups: dict[_K, list[_V]], pair: tuple[_K, _V]) -> dict[_K, list[_V]]:
-        key, value = pair
+def _group_by(pairs: Iterable[tuple[_K, _V]]) -> dict[_K, list[_V]]:
+    groups: dict[_K, list[_V]] = {}
+    for key, value in pairs:
         groups.setdefault(key, []).append(value)
-        return groups
-
-    return reduce(accumulate, pairs, {})
+    return groups
 
 
 class _IncompatibleUnion(Exception):
@@ -178,7 +175,7 @@ class UnionConverterFactory(ConverterFactory[Any, Any]):
             key=lambda c: 0 if isinstance(c, NoOpConverter) else 1,
         )
 
-        converters_by_origin: dict[type, list[Converter[Any, Any]]] = _group_pairs(
+        converters_by_origin: dict[type, list[Converter[Any, Any]]] = _group_by(
             (origin, conv)
             for origin, conv in origin_converters
             if origin is not Any and origin is not object

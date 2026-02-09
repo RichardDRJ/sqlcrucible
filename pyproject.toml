@@ -1,7 +1,7 @@
 [project]
 name = "sqlcrucible"
 dynamic = ["version"]
-description = "Add your description here"
+description = "Define a single model that works as both Pydantic and SQLAlchemy, with explicit conversion between the two"
 readme = "README.md"
 authors = [
     { name = "Richard Rae-Jones", email = "sqlcrucible@richard.rdrj.uk" }
