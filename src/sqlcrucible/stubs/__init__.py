@@ -9,7 +9,13 @@ from functools import reduce
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 
-from sqlcrucible.stubs.codegen import ClassDef, build_import_block, generate_model_defs_for_entity
+from sqlcrucible.entity.core import SQLCrucibleEntity
+from sqlcrucible.stubs.codegen import (
+    ClassDef,
+    build_import_block,
+    construct_sa_type_stub,
+    generate_model_defs_for_entity,
+)
 from sqlcrucible.stubs.discovery import get_entities_from_module
 
 _T = TypeVar("_T")
@@ -79,6 +85,26 @@ def _write_to_stub_file(classdefs: list[ClassDef], stubs_root: Path, module_name
         fd.write(class_block)
 
 
+def _generate_automodel_stubs(
+    entities: list[type[SQLCrucibleEntity]],
+    output_dir: Path,
+):
+    all_classdefs = [
+        classdef for entity in entities for classdef in generate_model_defs_for_entity(entity)
+    ]
+    classdefs_by_module = _group_by(all_classdefs, lambda it: it.module)
+    for module, classdefs in classdefs_by_module.items():
+        classdefs = list(_unique_by(classdefs, lambda it: it.source))
+        _write_to_stub_file(classdefs, output_dir, module)
+
+
+def _generate_sa_type_stub(entities: list[type[SQLCrucibleEntity]], output_dir: Path) -> None:
+    sa_type_stub = construct_sa_type_stub(entities)
+    sa_type_path = _stub_path(output_dir, "sqlcrucible.entity.sa_type")
+    sa_type_path.parent.mkdir(parents=True, exist_ok=True)
+    sa_type_path.write_text(sa_type_stub)
+
+
 def generate_stubs_for_module(
     module_path: str,
     output_dir: Path,
@@ -93,13 +119,8 @@ def generate_stubs_for_module(
     if not entities:
         raise ValueError(f"No SQLCrucibleEntity subclasses found in {module_path}")
 
-    all_classdefs = [
-        classdef for entity in entities for classdef in generate_model_defs_for_entity(entity)
-    ]
-    classdefs_by_module = _group_by(all_classdefs, lambda it: it.module)
-    for module, classdefs in classdefs_by_module.items():
-        classdefs = list(_unique_by(classdefs, lambda it: it.source))
-        _write_to_stub_file(classdefs, output_dir, module)
+    _generate_automodel_stubs(entities, output_dir)
+    _generate_sa_type_stub(entities, output_dir)
 
 
 def generate_stubs(
@@ -108,11 +129,33 @@ def generate_stubs(
 ):
     """Generate stubs for multiple modules.
 
+    Discovers all entities across all modules before generating stubs.
+    This ensures automodels (and their backing tables) are all created
+    first, so foreign-key column types can be resolved when the tables
+    they reference share the same MetaData.
+
     Args:
         module_paths: List of dotted module paths.
         output_dir: Root output directory for stubs.
     """
     output_path = Path(output_dir)
 
-    for module_path in module_paths:
-        generate_stubs_for_module(module_path, output_path)
+    entities_by_module = {
+        module_path: get_entities_from_module(module_path) for module_path in module_paths
+    }
+    for module_path, entities in entities_by_module.items():
+        if not entities:
+            raise ValueError(f"No SQLCrucibleEntity subclasses found in {module_path}")
+
+    all_entities = [entity for entities in entities_by_module.values() for entity in entities]
+
+    # Force automodel creation for all entities before generating stubs.
+    # This populates the shared MetaData with all tables, allowing SQLAlchemy
+    # to resolve foreign-key column types that reference other entities' tables.
+    for entity in all_entities:
+        _ = entity.__sqlalchemy_type__
+
+    for entities in entities_by_module.values():
+        _generate_automodel_stubs(entities, output_path)
+
+    _generate_sa_type_stub(all_entities, output_path)

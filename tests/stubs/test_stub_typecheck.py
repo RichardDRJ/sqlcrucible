@@ -11,6 +11,9 @@ import pytest
 from sqlcrucible.stubs import generate_stubs_for_module
 
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
 def run_typechecker(
     checker: str,
     code: str,
@@ -32,15 +35,18 @@ def run_typechecker(
 
         if checker == "pyright":
             config = tmppath / "pyrightconfig.json"
-            config_data: dict[str, str] = {"stubPath": str(stub_dir)}
+            config_data: dict = {
+                "stubPath": str(stub_dir),
+                "extraPaths": [str(_PROJECT_ROOT)],
+            }
             config.write_text(json.dumps(config_data))
             cmd = ["pyright", str(test_file)]
         elif checker == "ty":
-            # ty doesn't follow .pth files, so we need explicit search paths.
-            # Stubs use namespace packages (no __init__.pyi for existing packages)
-            # so they can be searched first without shadowing.
+            # Stubs searched first so SAType overloads take priority over source.
+            # Project root searched second so test entity modules are resolvable.
             cmd = ["ty", "check", str(test_file)]
             cmd.extend(["--extra-search-path", str(stub_dir)])
+            cmd.extend(["--extra-search-path", str(_PROJECT_ROOT)])
         else:
             raise ValueError(f"Unknown checker: {checker}")
 
@@ -59,21 +65,18 @@ def stub_dir():
 
 @pytest.mark.parametrize("checker", ["pyright", "ty"])
 def test_valid_column_access_passes(checker, stub_dir):
-    """Accessing valid columns passes type checking."""
+    """Accessing valid columns passes type checking via SAType."""
     code = dedent("""\
-    from typing import assert_never, assert_type, cast, TypeVar, reveal_type
+    from typing import assert_type, TypeVar
     from tests.stubs.sample_models import SimpleTrack
+    from sqlcrucible.entity.sa_type import SAType
     from uuid import UUID
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    reveal_type(SimpleTrack)
-    reveal_type(SimpleTrack.__sqlalchemy_type__)
-    sa_entity = cast_to(SimpleTrack.__sqlalchemy_type__, object())
-
-    reveal_type(sa_entity)
+    sa_entity = cast_to(SAType[SimpleTrack], object())
 
     assert_type(sa_entity.id, UUID)
     assert_type(sa_entity.title, str)
@@ -83,16 +86,16 @@ def test_valid_column_access_passes(checker, stub_dir):
     assert returncode == 0, f"{checker} failed: {output}"
 
 
-# This is only run with ty for now because it's not erroring - instead it's inferring
-# `nonexistent_column` to be `Unknown`
+# This is only run with pyright for now because ty infers `nonexistent_column` as `Unknown`
 @pytest.mark.parametrize("checker", ["pyright"])
 def test_invalid_column_access_fails(checker, stub_dir):
     """Accessing non-existent columns fails type checking."""
 
     code = dedent("""\
     from tests.stubs.sample_models import SimpleTrack
+    from sqlcrucible.entity.sa_type import SAType
 
-    x = SimpleTrack.__sqlalchemy_type__.nonexistent_column
+    x = SAType[SimpleTrack].nonexistent_column
     """)
     returncode, output = run_typechecker(checker, code, stub_dir)
     print(output)
@@ -103,16 +106,16 @@ def test_invalid_column_access_fails(checker, stub_dir):
 def test_inheritance_columns_accessible(checker, stub_dir):
     """Inherited columns are accessible on child types."""
     code = dedent("""\
-    from typing import assert_never, assert_type, cast, reveal_type, TypeVar
+    from typing import assert_type, TypeVar
     from tests.stubs.sample_models import Dog
+    from sqlcrucible.entity.sa_type import SAType
     from uuid import UUID
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    sa_entity = cast_to(Dog.__sqlalchemy_type__, object())
-    reveal_type(sa_entity)
+    sa_entity = cast_to(SAType[Dog], object())
 
     assert_type(sa_entity.id, UUID)
     assert_type(sa_entity.name, str)
@@ -129,13 +132,14 @@ def test_excluded_field_has_correct_types(checker, stub_dir):
     code = dedent("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import EntityWithExcludedField
+    from sqlcrucible.entity.sa_type import SAType
     from uuid import UUID
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    sa_entity = cast_to(EntityWithExcludedField.__sqlalchemy_type__, object())
+    sa_entity = cast_to(SAType[EntityWithExcludedField], object())
 
     # These fields should exist and have correct types
     assert_type(sa_entity.id, UUID)
@@ -151,9 +155,10 @@ def test_excluded_field_not_on_sa_model(checker, stub_dir):
     """Accessing excluded field on SA model fails type checking."""
     code = dedent("""\
     from tests.stubs.sample_models import EntityWithExcludedField
+    from sqlcrucible.entity.sa_type import SAType
 
     # pydantic_only_field should NOT exist on the SA model
-    x = EntityWithExcludedField.__sqlalchemy_type__.pydantic_only_field
+    x = SAType[EntityWithExcludedField].pydantic_only_field
     """)
     returncode, output = run_typechecker(checker, code, stub_dir)
     assert returncode != 0, f"{checker} should have failed for excluded field access"
@@ -171,13 +176,14 @@ def test_many_to_one_relationship_type(checker, stub_dir):
     code = dedent("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import StubBook
+    from sqlcrucible.entity.sa_type import SAType
     from sqlcrucible.generated.tests.stubs.sample_models import StubAuthorAutoModel
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    book_sa = cast_to(StubBook.__sqlalchemy_type__, object())
+    book_sa = cast_to(SAType[StubBook], object())
 
     # author should be the StubAuthor SA type (scalar, not list)
     assert_type(book_sa.author, StubAuthorAutoModel)
@@ -192,13 +198,14 @@ def test_one_to_many_relationship_type(checker, stub_dir):
     code = dedent("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import StubAuthor
+    from sqlcrucible.entity.sa_type import SAType
     from sqlcrucible.generated.tests.stubs.sample_models import StubBookAutoModel
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    author_sa = cast_to(StubAuthor.__sqlalchemy_type__, object())
+    author_sa = cast_to(SAType[StubAuthor], object())
 
     # books should be a list of StubBook SA types
     assert_type(author_sa.books, list[StubBookAutoModel])
@@ -213,13 +220,14 @@ def test_relationship_fields_accessible(checker, stub_dir):
     code = dedent("""\
     from typing import TypeVar, reveal_type
     from tests.stubs.sample_models import StubAuthor, StubBook
+    from sqlcrucible.entity.sa_type import SAType
 
     T = TypeVar("T")
     def cast_to(cls: type[T], obj: object) -> T:
         return obj  # type: ignore
 
-    author_sa = cast_to(StubAuthor.__sqlalchemy_type__, object())
-    book_sa = cast_to(StubBook.__sqlalchemy_type__, object())
+    author_sa = cast_to(SAType[StubAuthor], object())
+    book_sa = cast_to(SAType[StubBook], object())
 
     # Both relationship fields should be accessible
     reveal_type(author_sa.books)
@@ -282,6 +290,54 @@ def test_satype_in_select_statement(checker, stub_dir):
 
     # Typical usage pattern
     stmt = select(SAType[SimpleTrack]).where(SAType[SimpleTrack].duration_seconds > 180)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
+
+
+# =============================================================================
+# Entity type preservation tests — stubs must not shadow entity source
+# =============================================================================
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_entity_fields_retain_pydantic_types(checker, stub_dir):
+    """Entity field types are their declared Pydantic types, not InstrumentedAttribute."""
+    code = dedent("""\
+    from typing import assert_type
+    from tests.stubs.sample_models import SimpleTrack
+    from uuid import UUID
+
+    track = SimpleTrack(title="x", duration_seconds=1)
+    assert_type(track.id, UUID)
+    assert_type(track.title, str)
+    assert_type(track.duration_seconds, int)
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_entity_subclass_is_assignable_to_parent(checker, stub_dir):
+    """Entity subclass instances are assignable to parent type annotations."""
+    code = dedent("""\
+    from tests.stubs.sample_models import Animal, Dog
+
+    dog = Dog(type="dog", name="Rex")
+    animal: Animal = dog
+    """)
+    returncode, output = run_typechecker(checker, code, stub_dir)
+    assert returncode == 0, f"{checker} failed: {output}"
+
+
+@pytest.mark.parametrize("checker", ["pyright", "ty"])
+def test_entity_to_sa_model_available(checker, stub_dir):
+    """Entity methods like to_sa_model are still visible with stubs present."""
+    code = dedent("""\
+    from tests.stubs.sample_models import SimpleTrack
+
+    track = SimpleTrack(title="x", duration_seconds=1)
+    sa = track.to_sa_model()
     """)
     returncode, output = run_typechecker(checker, code, stub_dir)
     assert returncode == 0, f"{checker} failed: {output}"
