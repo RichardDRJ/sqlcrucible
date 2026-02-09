@@ -264,9 +264,7 @@ class SQLAlchemyFieldDefinition:
             # Case 2: Mapped[T] - SQLAlchemy's type wrapper, unwrap and recurse
             case sqlalchemy.orm.Mapped, (tp):
                 inner = cls._canonicalise_typeform(source_name, tp)
-                field = SQLAlchemyField.merge_all(
-                    *(it for it in [inner.field, SQLAlchemyField()] if it)
-                )
+                field = SQLAlchemyField.merge_all(inner.field, SQLAlchemyField())
                 return CanonicalisedTypeform(
                     tp=inner.tp,
                     field=field,

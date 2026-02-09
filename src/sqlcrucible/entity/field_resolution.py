@@ -5,17 +5,14 @@ from typing import (
     Any,
     Generic,
     TypeVar,
-    cast,
     TYPE_CHECKING,
 )
 
 from sqlalchemy import inspect
-from sqlalchemy.inspection import Inspectable
 from sqlalchemy.orm import (
     ColumnProperty,
     RelationshipProperty,
     CompositeProperty,
-    Mapper,
 )
 from typing_extensions import get_annotations, Format
 
@@ -73,39 +70,56 @@ def get_to_sa_model_converter(cls: type[_E], field_def: SQLAlchemyFieldDefinitio
     return result
 
 
-def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> Any:
-    if field_def.mapped_tp:
-        return field_def.mapped_tp
+def resolve_sa_field_type(sa_type: type, field_name: str) -> Any:
+    """Determine the Python type of a SQLAlchemy model field.
 
-    sqlalchemy_type = cast(Inspectable[Mapper[Any]], cls.__sqlalchemy_type__)
+    Looks up the field's type from annotations first, then falls back to
+    inspecting mapper properties (columns, relationships, composites).
 
-    annotations = get_annotations(sqlalchemy_type, eval_str=True, format=Format.VALUE)
-    if (annotation := annotations.get(field_def.mapped_name)) is not None:
-        evaluated = evaluate_forward_refs(annotation, owner=cls.__sqlalchemy_type__)
-        # Strip Mapped[] wrapper since converters work with the inner type
-        return unwrap(evaluated)
+    Args:
+        sa_type: The SQLAlchemy model class.
+        field_name: The name of the field to resolve.
 
-    attrs = inspect(sqlalchemy_type).attrs
-    prop = attrs.get(field_def.mapped_name)
+    Returns:
+        The resolved Python type for the field, or None if the field has
+        an unrecognised mapper property type.
+    """
+    annotations = get_annotations(sa_type, eval_str=True, format=Format.VALUE)
+    if (annotation := annotations.get(field_name)) is not None:
+        return evaluate_forward_refs(annotation, owner=sa_type)
+
+    attrs = inspect(sa_type).attrs
+    prop = attrs.get(field_name)
     match prop:
         case ColumnProperty():
             return prop.columns[0].type.python_type
         case RelationshipProperty():
             entity_class = prop.entity.class_
-            # For collection relationships (one-to-many, many-to-many), wrap in list
             if prop.uselist:
                 return list[entity_class]
             return entity_class
         case CompositeProperty():
             return prop.composite_class
         case _:
-            # Fall back to source type for descriptors like hybrid_property
-            if field_def.source_tp is not None:
-                return field_def.source_tp
-            prop_type = type(prop).__name__ if prop is not None else "None"
-            raise TypeError(
-                f"Cannot determine type for field '{field_def.source_name}' in {cls.__name__}: "
-                f"SQLAlchemy attribute '{field_def.mapped_name}' has unsupported property type '{prop_type}'.\n"
-                f"Hint: Use SQLAlchemyField(tp=...) to explicitly specify the mapped type:\n"
-                f"    {field_def.source_name}: Annotated[..., SQLAlchemyField(tp=YourType)]"
-            )
+            return None
+
+
+def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> Any:
+    if field_def.mapped_tp:
+        return field_def.mapped_tp
+
+    sa_type = cls.__sqlalchemy_type__
+    resolved = resolve_sa_field_type(sa_type, field_def.mapped_name)
+    if resolved is not None:
+        # Strip Mapped[] wrapper since converters work with the inner type
+        return unwrap(resolved)
+
+    # Fall back to source type for descriptors like hybrid_property
+    if field_def.source_tp is not None:
+        return field_def.source_tp
+    raise TypeError(
+        f"Cannot determine type for field '{field_def.source_name}' in {cls.__name__}: "
+        f"SQLAlchemy attribute '{field_def.mapped_name}' has unsupported property type.\n"
+        f"Hint: Use SQLAlchemyField(tp=...) to explicitly specify the mapped type:\n"
+        f"    {field_def.source_name}: Annotated[..., SQLAlchemyField(tp=YourType)]"
+    )

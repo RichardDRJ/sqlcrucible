@@ -11,9 +11,7 @@ from typing import (
     Final,
     Generic,
     Literal,
-    ParamSpec,
     Self,
-    TYPE_CHECKING,
     TypeVar,
     cast,
     get_origin,
@@ -43,7 +41,6 @@ from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor
 
 _LP_T = TypeVar("_LP_T")
 _LP_R = TypeVar("_LP_R")
-_LP_P = ParamSpec("_LP_P")
 
 UNSET = cast(Any, object())
 
@@ -68,19 +65,6 @@ class _lazyproperty(Generic[_LP_T, _LP_R]):
 def lazyproperty(func: Callable[[type[_LP_T]], _LP_R]) -> _LP_R:
     return cast(_LP_R, _lazyproperty(func))
 
-
-class lazymethod(Generic[_LP_T, _LP_P, _LP_R]):
-    """Descriptor that lazily defines a method on a class."""
-
-    def __init__(self, supplier: Callable[[type[_LP_T]], Callable[_LP_P, _LP_R]]) -> None:
-        self._supplier = supplier
-
-    def __call__(self, wrapped: Callable[_LP_P, _LP_R]) -> Callable[_LP_P, _LP_R]:
-        return cast(Callable[_LP_P, _LP_R], lazyproperty(self._supplier))
-
-
-if TYPE_CHECKING:
-    pass
 
 #: Direction of conversion: entity to SQLAlchemy model or vice versa
 ConversionDirection = Literal["to_sa", "from_sa"]

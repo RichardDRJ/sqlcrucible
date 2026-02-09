@@ -36,10 +36,6 @@ class SAType(metaclass=SATypeMeta):
     can provide autocompletion for column names.
     """
 
-    @classmethod
-    def __class_getitem__(cls, item: HasSAType[_S]) -> _S:
-        return item.__sqlalchemy_type__
-
     if TYPE_CHECKING:
 
         def __setattr__(self, key: str, value: Any): ...
