@@ -15,6 +15,7 @@ from sqlcrucible.stubs.codegen import (
     build_import_block,
     construct_sa_type_stub,
     generate_model_defs_for_entity,
+    subclass_first,
 )
 from sqlcrucible.stubs.discovery import get_entities_from_module
 
@@ -105,29 +106,11 @@ def _generate_sa_type_stub(entities: list[type[SQLCrucibleEntity]], output_dir: 
     sa_type_path.write_text(sa_type_stub)
 
 
-def generate_stubs_for_module(
-    module_path: str,
-    output_dir: Path,
-):
-    """Generate stub files for a module.
-
-    Args:
-        module_path: Dotted module path (e.g., 'myapp.models')
-        output_dir: Root output directory for stubs.
-    """
-    entities = get_entities_from_module(module_path)
-    if not entities:
-        raise ValueError(f"No SQLCrucibleEntity subclasses found in {module_path}")
-
-    _generate_automodel_stubs(entities, output_dir)
-    _generate_sa_type_stub(entities, output_dir)
-
-
 def generate_stubs(
     module_paths: list[str],
     output_dir: str = "stubs",
 ):
-    """Generate stubs for multiple modules.
+    """Generate stubs for one or more modules.
 
     Discovers all entities across all modules before generating stubs.
     This ensures automodels (and their backing tables) are all created
@@ -143,19 +126,26 @@ def generate_stubs(
     entities_by_module = {
         module_path: get_entities_from_module(module_path) for module_path in module_paths
     }
-    for module_path, entities in entities_by_module.items():
-        if not entities:
-            raise ValueError(f"No SQLCrucibleEntity subclasses found in {module_path}")
+    modules_without_entities = [
+        module_path for module_path, entities in entities_by_module.items() if not entities
+    ]
+    if modules_without_entities:
+        raise ValueError(
+            f"No SQLCrucibleEntity subclasses found in modules: {modules_without_entities}"
+        )
 
     all_entities = [entity for entities in entities_by_module.values() for entity in entities]
+
+    # Expand to include base classes (SQLCrucibleBaseModel, etc.) that
+    # will appear in SAType overloads, so their automodel stubs are generated too.
+    all_with_bases = subclass_first(all_entities)
 
     # Force automodel creation for all entities before generating stubs.
     # This populates the shared MetaData with all tables, allowing SQLAlchemy
     # to resolve foreign-key column types that reference other entities' tables.
-    for entity in all_entities:
+    for entity in all_with_bases:
         _ = entity.__sqlalchemy_type__
 
-    for entities in entities_by_module.values():
-        _generate_automodel_stubs(entities, output_path)
+    _generate_automodel_stubs(all_with_bases, output_path)
 
     _generate_sa_type_stub(all_entities, output_path)

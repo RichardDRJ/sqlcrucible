@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sqlcrucible.stubs import _write_to_stub_file, generate_stubs, generate_stubs_for_module
+from sqlcrucible.stubs import _write_to_stub_file, generate_stubs
 from sqlcrucible.stubs.codegen import construct_model_def
 
 from tests.stubs.sample_models import SimpleTrack
@@ -47,12 +47,6 @@ def test_write_stub_skips_init_pyi_for_source_package(stubs_root: Path):
         package_dir = stubs_root.joinpath(*parts[:i])
         init_pyi = package_dir / "__init__.pyi"
         assert not init_pyi.exists(), f"Expected {init_pyi} to NOT exist for source package"
-
-
-def test_generate_stubs_for_module_no_entities_raises():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(ValueError, match="No SQLCrucibleEntity subclasses found"):
-            generate_stubs_for_module("json", Path(tmpdir))
 
 
 def test_generate_stubs_no_entities_raises():

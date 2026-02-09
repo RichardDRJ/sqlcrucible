@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from sqlcrucible.stubs import generate_stubs_for_module
+from sqlcrucible.stubs import generate_stubs
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -55,5 +55,5 @@ def stub_dir():
     """Generate stubs once per test module."""
     with tempfile.TemporaryDirectory() as tmpdir:
         stub_path = Path(tmpdir)
-        generate_stubs_for_module("tests.stubs.sample_models", stub_path)
+        generate_stubs(["tests.stubs.sample_models"], output_dir=str(stub_path))
         yield stub_path

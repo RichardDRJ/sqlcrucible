@@ -7,7 +7,7 @@ import re
 import pytest
 
 from sqlcrucible.entity.core import SQLCrucibleEntity
-from sqlcrucible.stubs.codegen import _subclass_first, construct_sa_type_stub
+from sqlcrucible.stubs.codegen import subclass_first, construct_sa_type_stub
 
 from tests.stubs.sample_models import (
     Animal,
@@ -26,41 +26,41 @@ def _entity_order(result: list[type[SQLCrucibleEntity]], entities: list[type]) -
 
 
 def test_subclass_first_child_before_parent():
-    result = _subclass_first([Animal, Dog])
+    result = subclass_first([Animal, Dog])
     order = _entity_order(result, [Animal, Dog])
     assert order == [Dog, Animal]
 
 
 def test_subclass_first_child_before_parent_regardless_of_input_order():
-    result_parent_first = _subclass_first([Animal, Dog])
-    result_child_first = _subclass_first([Dog, Animal])
+    result_parent_first = subclass_first([Animal, Dog])
+    result_child_first = subclass_first([Dog, Animal])
     order_a = _entity_order(result_parent_first, [Animal, Dog])
     order_b = _entity_order(result_child_first, [Animal, Dog])
     assert order_a == order_b == [Dog, Animal]
 
 
 def test_subclass_first_includes_ancestors():
-    result = _subclass_first([Dog])
+    result = subclass_first([Dog])
     assert Animal in result
 
 
 def test_subclass_first_disjoint_entities():
-    result = _subclass_first([SimpleTrack, StubAuthor])
+    result = subclass_first([SimpleTrack, StubAuthor])
     assert SimpleTrack in result
     assert StubAuthor in result
 
 
 def test_subclass_first_empty():
-    assert _subclass_first([]) == []
+    assert subclass_first([]) == []
 
 
 def test_subclass_first_single_entity():
-    result = _subclass_first([SimpleTrack])
+    result = subclass_first([SimpleTrack])
     assert result[0] is SimpleTrack
 
 
 def test_subclass_first_no_duplicates():
-    result = _subclass_first([Animal, Dog, SimpleTrack])
+    result = subclass_first([Animal, Dog, SimpleTrack])
     assert len(result) == len(set(result))
 
 
