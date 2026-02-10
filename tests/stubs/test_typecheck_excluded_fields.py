@@ -1,16 +1,9 @@
 """Tests that excluded fields are omitted from generated stubs."""
 
-from textwrap import dedent
-
-import pytest
-
-from tests.stubs.conftest import run_typechecker
+from tests.stubs.conftest import typecheck
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_excluded_field_has_correct_types(checker, stub_dir):
-    """Excluded fields don't appear on SA model but included fields do."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import EntityWithExcludedField
     from sqlcrucible.entity.sa_type import SAType
@@ -25,21 +18,20 @@ def test_excluded_field_has_correct_types(checker, stub_dir):
     # These fields should exist and have correct types
     assert_type(sa_entity.id, UUID)
     assert_type(sa_entity.name, str)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_excluded_field_has_correct_types(typecheck_outcome):
+    """Excluded fields don't appear on SA model but included fields do."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_excluded_field_not_on_sa_model(checker, stub_dir):
-    """Accessing excluded field on SA model fails type checking."""
-    code = dedent("""\
+@typecheck("""\
     from tests.stubs.sample_models import EntityWithExcludedField
     from sqlcrucible.entity.sa_type import SAType
 
     # pydantic_only_field should NOT exist on the SA model
     x = SAType[EntityWithExcludedField].pydantic_only_field
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode != 0, f"{checker} should have failed for excluded field access"
-    assert "pydantic_only_field" in output
+""")
+def test_excluded_field_not_on_sa_model(typecheck_outcome):
+    """Accessing excluded field on SA model fails type checking."""
+    typecheck_outcome.assert_error()
+    assert "pydantic_only_field" in typecheck_outcome.output

@@ -1,16 +1,9 @@
 """Tests that column access on generated stubs is type-correct."""
 
-from textwrap import dedent
-
-import pytest
-
-from tests.stubs.conftest import run_typechecker
+from tests.stubs.conftest import typecheck
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_valid_column_access_passes(checker, stub_dir):
-    """Accessing valid columns passes type checking via SAType."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import SimpleTrack
     from sqlcrucible.entity.sa_type import SAType
@@ -25,30 +18,24 @@ def test_valid_column_access_passes(checker, stub_dir):
     assert_type(sa_entity.id, UUID)
     assert_type(sa_entity.title, str)
     assert_type(sa_entity.duration_seconds, int)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_valid_column_access_passes(typecheck_outcome):
+    """Accessing valid columns passes type checking via SAType."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_invalid_column_access_fails(checker, stub_dir):
-    """Accessing non-existent columns fails type checking."""
-
-    code = dedent("""\
+@typecheck("""\
     from tests.stubs.sample_models import SimpleTrack
     from sqlcrucible.entity.sa_type import SAType
 
     x = SAType[SimpleTrack].nonexistent_column
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    print(output)
-    assert returncode != 0, f"{checker} should have failed for invalid column"
+""")
+def test_invalid_column_access_fails(typecheck_outcome):
+    """Accessing non-existent columns fails type checking."""
+    typecheck_outcome.assert_error()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_inheritance_columns_accessible(checker, stub_dir):
-    """Inherited columns are accessible on child types."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import Dog
     from sqlcrucible.entity.sa_type import SAType
@@ -64,15 +51,13 @@ def test_inheritance_columns_accessible(checker, stub_dir):
     assert_type(sa_entity.name, str)
     assert_type(sa_entity.bones_chewed, int | None)
     assert_type(sa_entity.type, str)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_inheritance_columns_accessible(typecheck_outcome):
+    """Inherited columns are accessible on child types."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_abstract_parent_columns_accessible_on_concrete_child(checker, stub_dir):
-    """Fields defined on an abstract parent are accessible via SAType on the concrete child."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import StubConcreteChild
     from sqlcrucible.entity.sa_type import SAType
@@ -87,6 +72,7 @@ def test_abstract_parent_columns_accessible_on_concrete_child(checker, stub_dir)
     assert_type(sa_entity.id, UUID)
     assert_type(sa_entity.own_field, int)
     assert_type(sa_entity.shared_name, str)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_abstract_parent_columns_accessible_on_concrete_child(typecheck_outcome):
+    """Fields defined on an abstract parent are accessible via SAType on the concrete child."""
+    typecheck_outcome.assert_ok()

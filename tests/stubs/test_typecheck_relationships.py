@@ -1,16 +1,9 @@
 """Tests that relationship stubs have correct types."""
 
-from textwrap import dedent
-
-import pytest
-
-from tests.stubs.conftest import run_typechecker
+from tests.stubs.conftest import typecheck
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_many_to_one_relationship_type(checker, stub_dir):
-    """Many-to-one relationship field has correct scalar type."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import StubBook
     from sqlcrucible.entity.sa_type import SAType
@@ -24,15 +17,13 @@ def test_many_to_one_relationship_type(checker, stub_dir):
 
     # author should be the StubAuthor SA type (scalar, not list)
     assert_type(book_sa.author, StubAuthorAutoModel)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_many_to_one_relationship_type(typecheck_outcome):
+    """Many-to-one relationship field has correct scalar type."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_one_to_many_relationship_type(checker, stub_dir):
-    """One-to-many relationship field has correct list type."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type, TypeVar
     from tests.stubs.sample_models import StubAuthor
     from sqlcrucible.entity.sa_type import SAType
@@ -46,15 +37,13 @@ def test_one_to_many_relationship_type(checker, stub_dir):
 
     # books should be a list of StubBook SA types
     assert_type(author_sa.books, list[StubBookAutoModel])
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_one_to_many_relationship_type(typecheck_outcome):
+    """One-to-many relationship field has correct list type."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_relationship_fields_accessible(checker, stub_dir):
-    """Relationship fields are accessible on SA models."""
-    code = dedent("""\
+@typecheck("""\
     from typing import TypeVar, reveal_type
     from tests.stubs.sample_models import StubAuthor, StubBook
     from sqlcrucible.entity.sa_type import SAType
@@ -73,6 +62,7 @@ def test_relationship_fields_accessible(checker, stub_dir):
     # Regular fields should still work
     reveal_type(author_sa.name)
     reveal_type(book_sa.title)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_relationship_fields_accessible(typecheck_outcome):
+    """Relationship fields are accessible on SA models."""
+    typecheck_outcome.assert_ok()
