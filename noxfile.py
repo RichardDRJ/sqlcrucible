@@ -11,6 +11,17 @@ nox.options.reuse_existing_virtualenvs = True
 
 SUPPORTED_PYTHON_VERSIONS = nox.project.python_versions(nox.project.load_toml("pyproject.toml"))
 MIN_PYTHON_VERSION = SUPPORTED_PYTHON_VERSIONS[0]
+PYDANTIC_VERSIONS = ["2.10", "2.11", "2.12"]
+PYDANTIC_MAX_PYTHON: dict[str, str] = {
+    "2.10": "3.13",
+    "2.11": "3.13",
+}
+_TEST_MATRIX = [
+    (python, pydantic)
+    for python in SUPPORTED_PYTHON_VERSIONS
+    for pydantic in PYDANTIC_VERSIONS
+    if pydantic not in PYDANTIC_MAX_PYTHON or python <= PYDANTIC_MAX_PYTHON[pydantic]
+]
 
 
 def uv(*args: str, session: nox.Session) -> None:
@@ -62,10 +73,12 @@ def depcheck(session: nox.Session) -> None:
     session.run("deptry", "src", "tests")
 
 
-@nox.session(python=SUPPORTED_PYTHON_VERSIONS)
-def test(session: nox.Session) -> None:
+@nox.session
+@nox.parametrize(("python", "pydantic"), _TEST_MATRIX)
+def test(session: nox.Session, pydantic: str) -> None:
     """Run tests with pytest."""
     uv("sync", "--group", "test", session=session)
+    session.install(f"pydantic~={pydantic}.0")
     session.run("pytest", *session.posargs)
 
 

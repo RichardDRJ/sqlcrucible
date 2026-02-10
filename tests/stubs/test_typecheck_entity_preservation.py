@@ -1,16 +1,9 @@
 """Tests that stubs do not shadow entity source types."""
 
-from textwrap import dedent
-
-import pytest
-
-from tests.stubs.conftest import run_typechecker
+from tests.stubs.conftest import typecheck
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_entity_fields_retain_pydantic_types(checker, stub_dir):
-    """Entity field types are their declared Pydantic types, not InstrumentedAttribute."""
-    code = dedent("""\
+@typecheck("""\
     from typing import assert_type
     from tests.stubs.sample_models import SimpleTrack
     from uuid import UUID
@@ -19,32 +12,29 @@ def test_entity_fields_retain_pydantic_types(checker, stub_dir):
     assert_type(track.id, UUID)
     assert_type(track.title, str)
     assert_type(track.duration_seconds, int)
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_entity_fields_retain_pydantic_types(typecheck_outcome):
+    """Entity field types are their declared Pydantic types, not InstrumentedAttribute."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_entity_subclass_is_assignable_to_parent(checker, stub_dir):
-    """Entity subclass instances are assignable to parent type annotations."""
-    code = dedent("""\
+@typecheck("""\
     from tests.stubs.sample_models import Animal, Dog
 
     dog = Dog(type="dog", name="Rex")
     animal: Animal = dog
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_entity_subclass_is_assignable_to_parent(typecheck_outcome):
+    """Entity subclass instances are assignable to parent type annotations."""
+    typecheck_outcome.assert_ok()
 
 
-@pytest.mark.parametrize("checker", ["pyright", "ty"])
-def test_entity_to_sa_model_available(checker, stub_dir):
-    """Entity methods like to_sa_model are still visible with stubs present."""
-    code = dedent("""\
+@typecheck("""\
     from tests.stubs.sample_models import SimpleTrack
 
     track = SimpleTrack(title="x", duration_seconds=1)
     sa = track.to_sa_model()
-    """)
-    returncode, output = run_typechecker(checker, code, stub_dir)
-    assert returncode == 0, f"{checker} failed: {output}"
+""")
+def test_entity_to_sa_model_available(typecheck_outcome):
+    """Entity methods like to_sa_model are still visible with stubs present."""
+    typecheck_outcome.assert_ok()
