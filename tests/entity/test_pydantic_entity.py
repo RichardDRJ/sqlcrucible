@@ -257,3 +257,58 @@ def test_from_sa_model_raises_on_incompatible_type():
     with pytest.raises(ValueError) as exc_info:
         Artist.from_sa_model(other_sa)
     assert "Cannot create Artist from" in str(exc_info.value)
+
+
+def test_model_dump_roundtrip():
+    """Entity round-trips through model_dump() / model_validate()."""
+    track = Track(
+        name="Comfortably Numb",
+        artist_id=uuid4(),
+        length=timedelta(minutes=6, seconds=23),
+        notes="Epic guitar solo",
+    )
+
+    dumped = track.model_dump()
+    restored = Track.model_validate(dumped)
+
+    assert restored.id == track.id
+    assert restored.name == track.name
+    assert restored.artist_id == track.artist_id
+    assert restored.length == track.length
+    assert restored.notes == track.notes
+
+
+def test_model_dump_json_roundtrip():
+    """Entity round-trips through model_dump_json() / model_validate_json()."""
+    track = Track(
+        name="Comfortably Numb",
+        artist_id=uuid4(),
+        length=timedelta(minutes=6, seconds=23),
+        notes=None,
+    )
+
+    json_str = track.model_dump_json()
+    restored = Track.model_validate_json(json_str)
+
+    assert restored.id == track.id
+    assert restored.name == track.name
+    assert restored.artist_id == track.artist_id
+    assert restored.length == track.length
+    assert restored.notes is None
+
+
+def test_model_json_schema():
+    """model_json_schema() produces a valid schema with expected fields."""
+    schema = Artist.model_json_schema()
+
+    assert schema["type"] == "object"
+    assert "id" in schema["properties"]
+    assert "name" in schema["properties"]
+
+
+def test_model_json_schema_excludes_readonly_fields():
+    """model_json_schema() does not include readonly descriptor fields."""
+    schema = Track.model_json_schema()
+
+    assert "name" in schema["properties"]
+    assert "artist" not in schema["properties"]
