@@ -23,3 +23,4 @@ htmlcov/
 
 # MkDocs
 site/
+/.hypothesis/
