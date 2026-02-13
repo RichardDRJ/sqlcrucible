@@ -145,28 +145,53 @@ def _run_ty_batch(
     if not snippets:
         return {}
 
-    results: dict[str, TypecheckOutcome] = {}
     with tempfile.TemporaryDirectory() as tmpdir:
         tmppath = Path(tmpdir)
-        for i, (key, code) in enumerate(snippets.items()):
-            filepath = tmppath / f"snippet_{i}.py"
-            filepath.write_text(code)
-            proc = subprocess.run(
-                [
-                    "ty",
-                    "check",
-                    str(filepath),
-                    "--extra-search-path",
-                    str(stub_dir),
-                    "--extra-search-path",
-                    str(_PROJECT_ROOT),
-                ],
-                capture_output=True,
-                text=True,
-            )
-            results[key] = TypecheckOutcome("ty", proc.returncode, proc.stdout + proc.stderr)
 
-    return results
+        key_to_filename: dict[str, str] = {}
+        for i, (key, code) in enumerate(snippets.items()):
+            filename = f"snippet_{i}.py"
+            (tmppath / filename).write_text(code)
+            key_to_filename[key] = filename
+
+        proc = subprocess.run(
+            [
+                "ty",
+                "check",
+                *[str(tmppath / fn) for fn in key_to_filename.values()],
+                "--extra-search-path",
+                str(stub_dir),
+                "--extra-search-path",
+                str(_PROJECT_ROOT),
+                "--output-format",
+                "concise",
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        output = proc.stdout + proc.stderr
+        file_diagnostics: dict[str, list[str]] = {}
+        file_has_error: dict[str, bool] = {}
+        for line in output.splitlines():
+            if not line or line.startswith("Found "):
+                continue
+            # concise format: /path/to/snippet_N.py:line:col: severity[rule] message
+            parts = line.split(":", maxsplit=3)
+            if len(parts) >= 4:
+                fname = Path(parts[0]).name
+                file_diagnostics.setdefault(fname, []).append(line)
+                if "error[" in line:
+                    file_has_error[fname] = True
+
+        return {
+            key: TypecheckOutcome(
+                "ty",
+                1 if file_has_error.get(filename, False) else 0,
+                "\n".join(file_diagnostics.get(filename, [])),
+            )
+            for key, filename in key_to_filename.items()
+        }
 
 
 @pytest.fixture(scope="session")
