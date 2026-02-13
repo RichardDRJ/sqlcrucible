@@ -8,6 +8,9 @@ conversion, as an element inside a sequence, and as a value inside a dict.
 from dataclasses import dataclass
 from typing import Any
 
+import pytest
+
+from sqlcrucible.conversion import default_registry
 from sqlcrucible.conversion.caching import CachingConverter, _identity_map
 from sqlcrucible.conversion.dicts import DictConverter, DictInfo
 from sqlcrucible.conversion.registry import Converter
@@ -157,3 +160,50 @@ def test_shared_source_across_entity_and_sequence() -> None:
     assert from_list[0] is cached_shared
     assert direct is from_list[0]
     assert inner.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("source_tp", "target_tp"),
+    [
+        (int, int),
+        (list[int], list[int]),
+        (dict[str, int], dict[str, int]),
+        (int | str, int | str),
+    ],
+    ids=["noop", "sequence", "dict", "union"],
+)
+def test_default_registry_resolves_caching_converters(
+    source_tp: Any,
+    target_tp: Any,
+) -> None:
+    """Converters resolved from default_registry are wrapped with CachingConverter."""
+    converter = default_registry.resolve(source_tp, target_tp)
+    assert isinstance(converter, CachingConverter)
+
+
+def test_default_registry_sequence_converter_caches_by_identity() -> None:
+    """A list converted twice through default_registry returns the same object."""
+    converter = default_registry.resolve(list[int], list[int])
+    assert converter is not None
+
+    source = [1, 2, 3]
+
+    with _identity_map():
+        first = converter.convert(source)
+        second = converter.convert(source)
+
+    assert first is second
+
+
+def test_default_registry_dict_converter_caches_by_identity() -> None:
+    """A dict converted twice through default_registry returns the same object."""
+    converter = default_registry.resolve(dict[str, int], dict[str, int])
+    assert converter is not None
+
+    source = {"a": 1, "b": 2}
+
+    with _identity_map():
+        first = converter.convert(source)
+        second = converter.convert(source)
+
+    assert first is second
