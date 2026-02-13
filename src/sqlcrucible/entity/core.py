@@ -33,7 +33,7 @@ from sqlcrucible.entity.field_resolution import (
     get_from_sa_model_converter,
     get_to_sa_model_converter,
 )
-from sqlcrucible.conversion.caching import IdentityMap, _identity_map
+from sqlcrucible.conversion.caching import IdentityMap, _identity_map, CachingConverterFactory
 from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
 from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor
 
@@ -74,8 +74,8 @@ ConversionDirection = Literal["to_sa", "from_sa"]
 # This extends the base default_registry with entity conversion capabilities.
 _entity_registry = ConverterRegistry(
     *default_registry,
-    FromSAModelConverterFactory(),
-    ToSAModelConverterFactory(),
+    CachingConverterFactory(FromSAModelConverterFactory()),
+    CachingConverterFactory(ToSAModelConverterFactory()),
 )
 
 logger = getLogger(__name__)
