@@ -1,10 +1,7 @@
+from typing import Any, TypeVar, TYPE_CHECKING
+
 from sqlcrucible._types.annotations import unwrap, types_are_non_parameterised_and_equal
-from typing import Any, TYPE_CHECKING
-
-
-from sqlcrucible.conversion.registry import Converter, ConverterFactory
-from sqlcrucible.conversion.registry import ConverterRegistry
-from typing import TypeVar
+from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.core import SQLCrucibleEntity

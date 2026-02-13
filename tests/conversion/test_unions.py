@@ -1,11 +1,21 @@
 from tests.conversion.conftest import SourceItem, TargetItem
 
+from typing import Any, cast
+
+from sqlcrucible.conversion.caching import CachingConverter
 from sqlcrucible.conversion.noop import NoOpConverter
 
 import pytest
 
-from sqlcrucible.conversion.registry import ConverterRegistry
+from sqlcrucible.conversion.registry import Converter, ConverterRegistry
 from sqlcrucible.conversion.unions import UnionConverterFactory
+
+
+def _unwrap(converter: Converter[Any, Any]) -> Converter[Any, Any]:
+    """Unwrap a CachingConverter to get the inner converter."""
+    if isinstance(converter, CachingConverter):
+        return cast(Converter[Any, Any], converter._inner)
+    return converter
 
 
 @pytest.mark.parametrize(
@@ -59,7 +69,7 @@ def test_source_subset_of_target_union_uses_noop(
 ):
     conv = registry.resolve(source_tp, target_tp)
     assert conv is not None
-    assert isinstance(conv, NoOpConverter)
+    assert isinstance(_unwrap(conv), NoOpConverter)
 
 
 @pytest.mark.parametrize(

@@ -66,11 +66,65 @@ artist = readonly_field(
 
 ## Important Notes
 
-- **Cyclical references are not supported.** If `Artist` has a `tracks` relationship and `Track` has an `artist` relationship, use `readonly_field` on at least one side to break the cycle.
-
 - **Pydantic compatibility**: Either inherit from `SQLCrucibleBaseModel` (which includes the necessary config), or add `model_config = ConfigDict(ignored_types=(ReadonlyFieldDescriptor,))` to your model (import from `sqlcrucible`).
 
 - **Accessing without a backing model**: Accessing a `readonly_field` on an entity not loaded via `from_sa_model()` raises `RuntimeError`.
+
+## Serialisation
+
+By default, `readonly_field` values are **excluded** from `model_dump()` and `model_dump_json()`. This is by design — they are not Pydantic model fields.
+
+To include a readonly relationship in serialised output, wrap it with `computed_field`:
+
+```python
+from pydantic import computed_field
+
+class Track(SQLCrucibleBaseModel):
+    __sqlalchemy_params__ = {"__tablename__": "track"}
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    name: str
+    artist_id: Annotated[UUID, mapped_column(ForeignKey("artist.id"))]
+
+    artist = computed_field(readonly_field(
+        Artist,
+        relationship(lambda: SAType[Artist]),
+    ))
+```
+
+`ReadonlyFieldDescriptor` is a `property` subclass, so Pydantic's `computed_field` can infer the return type directly — no intermediate `@property` wrapper needed.
+
+!!! warning
+    If **both** sides of a bidirectional relationship wrap `readonly_field` with `computed_field`, Pydantic will detect a circular reference during `model_dump()` and raise a `ValueError`. Only expose one side of a cycle via `computed_field`.
+
+## Caching and Identity
+
+### Per-instance caching
+
+`readonly_field` caches the converted value per instance, so repeated access returns the same object:
+
+```python
+track = Track.from_sa_model(track_sa)
+track.artist is track.artist  # True — same object
+```
+
+This applies to all field types — entities, lists, and scalars.
+
+### Identity preservation
+
+Within a single `from_sa_model()` call, an identity map ensures that the same SQLAlchemy model instance always converts to the same entity. This means bidirectional relationships preserve object identity:
+
+```python
+author = Author.from_sa_model(author_sa)
+author.tracks[0].artist is author  # True — same entity, not a copy
+```
+
+Each top-level `from_sa_model()` call creates a fresh identity map, so separate calls produce independent instances:
+
+```python
+first = Author.from_sa_model(author_sa)
+second = Author.from_sa_model(author_sa)
+first is not second  # True — different calls, different instances
+```
 
 ## Example: One-to-Many Relationship
 
