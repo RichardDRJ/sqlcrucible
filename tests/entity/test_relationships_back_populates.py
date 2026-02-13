@@ -98,3 +98,39 @@ def test_back_populates_set_from_child():
     restored_author = BPAuthor.from_sa_model(author_sa)
     assert len(restored_author.books) == 1
     assert restored_author.books[0].title == "1984"
+
+
+def test_back_populates_preserves_identity():
+    """Traversing back through a bidirectional relationship returns the same object."""
+    author = BPAuthor(name="Jane Austen")
+    author_sa = author.to_sa_model()
+
+    book = BPBook(title="Pride and Prejudice", author_id=author.id)
+    book_sa = book.to_sa_model()
+    author_sa.books = [book_sa]
+
+    restored = BPAuthor.from_sa_model(author_sa)
+    assert restored.books[0].author is restored
+
+
+def test_back_populates_preserves_identity_at_depth():
+    """Identity is preserved at multiple levels of traversal."""
+    author = BPAuthor(name="Jane Austen")
+    author_sa = author.to_sa_model()
+
+    book = BPBook(title="Pride and Prejudice", author_id=author.id)
+    book_sa = book.to_sa_model()
+    author_sa.books = [book_sa]
+
+    restored = BPAuthor.from_sa_model(author_sa)
+    assert restored.books[0].author.books[0] is restored.books[0]
+
+
+def test_independent_from_sa_model_calls_create_separate_entities():
+    """Two top-level from_sa_model() calls produce different entity instances."""
+    author = BPAuthor(name="Jane Austen")
+    author_sa = author.to_sa_model()
+
+    first = BPAuthor.from_sa_model(author_sa)
+    second = BPAuthor.from_sa_model(author_sa)
+    assert first is not second

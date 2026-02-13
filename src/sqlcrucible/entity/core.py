@@ -33,6 +33,7 @@ from sqlcrucible.entity.field_resolution import (
     get_from_sa_model_converter,
     get_to_sa_model_converter,
 )
+from sqlcrucible.conversion.caching import IdentityMap, _identity_map
 from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
 from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor
 
@@ -175,6 +176,7 @@ class SQLCrucibleEntity:
     __sqlalchemy_automodel__: ClassVar[SQLAlchemyModelType]
     __sqlalchemy_type__: ClassVar[SQLAlchemyModelType] = SQLAlchemyBase
     __sa_model__: SQLAlchemyModel | None = None
+    __identity_map__: IdentityMap | None = None
 
     def __init_subclass__(cls) -> None:
         if "__sqlalchemy_automodel__" not in cls.__dict__:
@@ -305,14 +307,18 @@ class SQLCrucibleEntity:
 
     @classmethod
     def _from_sa_model(cls, sa_model: Any) -> Self:
-        kwargs = {}
-        for conversion_spec in cls.__from_sa_model_converters__():
-            value = getattr(sa_model, conversion_spec.mapped_name)
-            kwargs[conversion_spec.source_name] = conversion_spec.converter.convert(value)
+        with _identity_map() as identity_map:
+            kwargs = {
+                conversion_spec.source_name: conversion_spec.converter.convert(value)
+                for conversion_spec in cls.__from_sa_model_converters__()
+                for value in (getattr(sa_model, conversion_spec.mapped_name),)
+            }
 
-        result = cls(**kwargs)
-        result.__sa_model__ = sa_model
-        return result
+            result = cls(**kwargs)
+            result.__sa_model__ = sa_model
+            result.__identity_map__ = identity_map
+            identity_map[id(sa_model)] = result
+            return result
 
     def to_sa_model(self) -> Any:
         """Convert this entity to a SQLAlchemy model instance.
@@ -323,10 +329,11 @@ class SQLCrucibleEntity:
         Returns:
             A SQLAlchemy model instance ready to be added to a session.
         """
-        kwargs = {}
-        for conversion_spec in self.__class__.__to_sa_model_converters__():
-            value = getattr(self, conversion_spec.source_name)
-            kwargs[conversion_spec.mapped_name] = conversion_spec.converter.convert(value)
+        kwargs = {
+            conversion_spec.mapped_name: conversion_spec.converter.convert(value)
+            for conversion_spec in self.__class__.__to_sa_model_converters__()
+            for value in (getattr(self, conversion_spec.source_name),)
+        }
 
         sa_type = self.__class__.__sqlalchemy_type__
         self.__sa_model__ = sa_type(**kwargs)

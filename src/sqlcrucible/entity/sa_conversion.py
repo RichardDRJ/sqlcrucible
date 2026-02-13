@@ -1,10 +1,8 @@
+from typing import Any, TypeVar, TYPE_CHECKING
+
 from sqlcrucible._types.annotations import unwrap, types_are_non_parameterised_and_equal
-from typing import Any, TYPE_CHECKING
-
-
-from sqlcrucible.conversion.registry import Converter, ConverterFactory
-from sqlcrucible.conversion.registry import ConverterRegistry
-from typing import TypeVar
+from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
+from sqlcrucible.conversion.caching import CachingConverter
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.core import SQLCrucibleEntity
@@ -47,7 +45,7 @@ class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return ToSAModelConverter(unwrap(source_tp))
+        return CachingConverter(ToSAModelConverter(unwrap(source_tp)))
 
 
 class FromSAModelConverter(Converter[_E, Any]):
@@ -85,4 +83,4 @@ class FromSAModelConverterFactory(ConverterFactory[Any, Any]):
     def converter(
         self, source_tp: Any, target_tp: Any, registry: ConverterRegistry
     ) -> Converter[Any, Any] | None:
-        return FromSAModelConverter(unwrap(target_tp))
+        return CachingConverter(FromSAModelConverter(unwrap(target_tp)))

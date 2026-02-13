@@ -79,3 +79,16 @@ def test_self_referential_relationship():
     restored_employee = Employee.from_sa_model(employee_sa)
     assert restored_employee.manager.name == "Manager"
     assert restored_employee.manager.manager.name == "CEO"
+
+
+def test_self_referential_preserves_identity():
+    """Traversing manager -> reports returns the same object."""
+    manager = Employee(name="Manager")
+    manager_sa = manager.to_sa_model()
+
+    employee = Employee(name="Employee", manager_id=manager.id)
+    employee_sa = employee.to_sa_model()
+    employee_sa.manager = manager_sa
+
+    restored = Employee.from_sa_model(employee_sa)
+    assert restored.manager.reports[0] is restored

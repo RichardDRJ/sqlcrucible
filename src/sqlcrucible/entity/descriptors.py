@@ -18,7 +18,8 @@ from typing import (
 
 from sqlalchemy.orm import ORMDescriptor
 
-import sqlcrucible.entity.field_resolution
+from sqlcrucible.conversion.caching import _identity_map
+from sqlcrucible.entity.field_resolution import get_from_sa_model_converter
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
@@ -28,14 +29,20 @@ from typing_extensions import get_annotations, Format
 if TYPE_CHECKING:
     from sqlcrucible.entity.core import SQLCrucibleEntity
 
+
 _O = TypeVar("_O", bound="SQLCrucibleEntity")
 _T = TypeVar("_T")
 
 
-class ReadonlyFieldDescriptor(Generic[_T, _O]):
+class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
     """Descriptor implementation for readonly_field.
 
     See readonly_field() function for documentation.
+
+    Subclasses property so that Pydantic's computed_field can extract the
+    return type via fget.__annotations__['return'], enabling the shorthand:
+
+        artist = computed_field(readonly_field(Artist, ...))
     """
 
     def __init__(
@@ -51,6 +58,12 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
             descriptor: Optional ORM descriptor (e.g., hybrid_property, association_proxy)
             sa_field: Optional SQLAlchemyField configuration for the mapped attribute
         """
+
+        def fget(instance: Any) -> Any: ...
+
+        fget.__annotations__["return"] = tp
+        super().__init__(fget=fget)
+
         self._tp = tp
         self._descriptor = descriptor
         self._sa_field = sa_field
@@ -139,16 +152,21 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
         return self._sa_field_info
 
     @overload
-    def __get__(self, instance: None, owner: type[_O]) -> Self: ...
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
 
     @overload
-    def __get__(self, instance: _O, owner: type[_O]) -> _T: ...
+    def __get__(self, instance: _O, owner: type[_O], /) -> _T: ...
 
-    def __get__(self, instance: _O | None, owner: type[_O]) -> _T | Self:
+    @overload
+    def __get__(self, instance: Any, owner: type | None = None, /) -> Any: ...
+
+    def __get__(self, instance: Any, owner: type | None = None, /) -> Any:
         """Get the field value from an entity instance.
 
         When accessed on the class, returns the descriptor itself.
         When accessed on an instance, loads the value from the SQLAlchemy model.
+        Results are cached per instance so that repeated access returns the
+        same object.
 
         Args:
             instance: The entity instance (or None if accessed on class)
@@ -162,24 +180,33 @@ class ReadonlyFieldDescriptor(Generic[_T, _O]):
         """
         if instance is None:
             return self
-        else:
-            field_info = self.sa_field_info
-            if self._converter is None:
-                self._converter = sqlcrucible.entity.field_resolution.get_from_sa_model_converter(
-                    owner, field_info
-                )
 
-            model = instance.__sa_model__
-            if model is None:
-                raise RuntimeError(
-                    f"Cannot access readonly_field '{self._name}' on {type(instance).__name__}: "
-                    f"this entity was not loaded from a SQLAlchemy model.\n"
-                    f"Hint: readonly_field values are only available on entities created via "
-                    f"from_sa_model(). If you need this field on manually-created entities, "
-                    f"consider using a regular field instead."
-                )
+        cache = instance.__dict__.get("__readonly_cache__")
+        if cache is not None and self._name in cache:
+            return cache[self._name]
 
-            return self._converter.convert(getattr(model, field_info.mapped_name))
+        field_info = self.sa_field_info
+        resolved_owner = cast(
+            type["SQLCrucibleEntity"], owner if owner is not None else type(instance)
+        )
+        if self._converter is None:
+            self._converter = get_from_sa_model_converter(resolved_owner, field_info)
+
+        model = instance.__sa_model__
+        if model is None:
+            raise RuntimeError(
+                f"Cannot access readonly_field '{self._name}' on {type(instance).__name__}: "
+                f"this entity was not loaded from a SQLAlchemy model.\n"
+                f"Hint: readonly_field values are only available on entities created via "
+                f"from_sa_model(). If you need this field on manually-created entities, "
+                f"consider using a regular field instead."
+            )
+
+        with _identity_map(instance.__identity_map__):
+            result = self._converter.convert(getattr(model, field_info.mapped_name))
+
+        instance.__dict__.setdefault("__readonly_cache__", {})[self._name] = result
+        return result
 
 
 @overload
