@@ -21,7 +21,7 @@ With SQLCrucible, you define your model once:
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
@@ -29,7 +29,7 @@ from sqlcrucible import SQLCrucibleBaseModel
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: Annotated[str, mapped_column()]
 ```
 

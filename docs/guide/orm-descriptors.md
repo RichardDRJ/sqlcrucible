@@ -12,7 +12,7 @@ Define the function **outside** the class body and use `readonly_field` to mark 
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -25,7 +25,7 @@ def _full_name(self) -> str:
 class Person(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "person"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     first_name: Annotated[str, mapped_column()]
     last_name: Annotated[str, mapped_column()]
 
@@ -62,7 +62,7 @@ You can also pass the descriptor directly to `readonly_field` instead of using `
 class Person(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "person"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     first_name: Annotated[str, mapped_column()]
     last_name: Annotated[str, mapped_column()]
 
@@ -98,7 +98,7 @@ _full_name_hybrid = hybrid_property(_get_full_name).setter(_set_full_name)
 class Person(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "person"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     first_name: Annotated[str, mapped_column()]
     last_name: Annotated[str, mapped_column()]
 
@@ -125,13 +125,13 @@ from sqlcrucible import SQLAlchemyField
 class Department(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "department"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: Annotated[str, mapped_column()]
 
 class Employee(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "employee"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: Annotated[str, mapped_column()]
     department_id: Annotated[UUID, mapped_column(ForeignKey("department.id"))]
 
@@ -170,7 +170,7 @@ Use a `creator` function to make the proxy writable:
 class Employee(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "employee"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     department_id: Annotated[UUID, mapped_column(ForeignKey("department.id"))]
 
     department = readonly_field(
@@ -187,7 +187,7 @@ class Employee(SQLCrucibleBaseModel):
         association_proxy(
             "department",
             "name",
-            creator=lambda name: SAType[Department](id=uuid4(), name=name),
+            creator=lambda name: SAType[Department](id=uuid7(), name=name),
         ),
     ]
 ```

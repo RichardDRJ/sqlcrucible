@@ -49,7 +49,7 @@
 
     ```python
     from typing import Annotated
-    from uuid import UUID, uuid4
+    from uuid import UUID, uuid7
     from pydantic import Field
     from sqlalchemy.orm import mapped_column
     from sqlcrucible import SQLCrucibleBaseModel
@@ -57,7 +57,7 @@
     class User(SQLCrucibleBaseModel):
         __sqlalchemy_params__ = {"__tablename__": "user"}
 
-        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
         name: str
         email: str
     ```
@@ -65,11 +65,11 @@
 === "SQLModel"
 
     ```python
-    from uuid import UUID, uuid4
+    from uuid import UUID, uuid7
     from sqlmodel import SQLModel, Field
 
     class User(SQLModel, table=True):
-        id: UUID = Field(default_factory=uuid4, primary_key=True)
+        id: UUID = Field(default_factory=uuid7, primary_key=True)
         name: str
         email: str
     ```
@@ -113,7 +113,7 @@
 
     class Author(SQLCrucibleBaseModel):
         __sqlalchemy_params__ = {"__tablename__": "author"}
-        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
         name: str
 
         books = readonly_field(
@@ -131,7 +131,7 @@
     from sqlmodel import Relationship
 
     class Author(SQLModel, table=True):
-        id: UUID = Field(default_factory=uuid4, primary_key=True)
+        id: UUID = Field(default_factory=uuid7, primary_key=True)
         name: str
 
         books: list["Book"] = Relationship(back_populates="author")
