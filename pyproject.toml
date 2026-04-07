@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICEN[CS]E*"]
 classifiers = [
+    "Topic :: Database",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -20,6 +22,10 @@ dependencies = [
     "sqlalchemy ~= 2.0",
     "typing-extensions ~= 4.15",
 ]
+
+[project.urls]
+Homepage = "https://sqlcrucible.rdrj.uk"
+Issues = "https://github.com/RichardDRJ/sqlcrucible/issues"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
