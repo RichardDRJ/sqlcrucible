@@ -45,7 +45,7 @@ def resolve_forward_refs(tp: Any, owner: type) -> Any:
     )
     globalns = vars(sys.modules[owner.__module__])
     localns = vars(owner)
-    hints = get_type_hints(temp, globalns=globalns, localns=localns)
+    hints = get_type_hints(temp, globalns=globalns, localns=localns, include_extras=True)
     return hints["_"]
 
 

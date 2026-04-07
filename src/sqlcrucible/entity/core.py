@@ -8,13 +8,11 @@ from typing import (
     Any,
     Callable,
     ClassVar,
-    Final,
     Generic,
     Literal,
     Self,
     TypeVar,
     cast,
-    get_origin,
 )
 
 from sqlalchemy import MetaData, Table
@@ -34,7 +32,12 @@ from sqlcrucible.entity.field_resolution import (
     get_to_sa_model_converter,
 )
 from sqlcrucible.conversion.caching import IdentityMap, _identity_map, CachingConverterFactory
-from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+from sqlcrucible.entity.field_definitions import (
+    CanonicalisedTypeform,
+    SQLCrucibleField,
+    ConversionStrategy,
+    canonicalise_typeform,
+)
 from sqlcrucible.entity.descriptors import ReadonlyFieldDescriptor
 
 
@@ -175,6 +178,7 @@ class SQLCrucibleEntity:
 
     __sqlalchemy_automodel__: ClassVar[SQLAlchemyModelType]
     __sqlalchemy_type__: ClassVar[SQLAlchemyModelType] = SQLAlchemyBase
+    __sqlcrucible_fields__: ClassVar[dict[str, SQLCrucibleField] | None] = None
     __sa_model__: SQLAlchemyModel | None = None
     __identity_map__: IdentityMap | None = None
 
@@ -186,43 +190,23 @@ class SQLCrucibleEntity:
         if "__sqlalchemy_type__" not in cls.__dict__:
             cls.__sqlalchemy_type__ = lazyproperty(_get_automodel)
 
-        annotations = get_annotations(cls, eval_str=True, format=Format.VALUE)
-        for key, ann in annotations.items():
-            origin = get_origin(ann)
-            if origin is ClassVar or origin is Final or ann is ClassVar or ann is Final:
+        # Register annotation-based fields as EAGER, skipping those already
+        # registered (e.g. by ReadonlyFieldDescriptor.__set_name__).
+        # get_annotations with FORWARDREF handles both stringified annotations
+        # (from __future__ import annotations) and Python 3.14+ lazy annotations
+        # (PEP 749), returning ForwardRef for unresolvable names. canonicalise_typeform
+        # wraps these in LazyCanonicalisedTypeform for deferred resolution.
+        registered = cls.__dict__.get("__sqlcrucible_fields__") or {}
+        for key, ann in get_annotations(cls, format=Format.FORWARDREF).items():
+            if key in registered:
                 continue
-            # Skip fields with readonly_field descriptor - they handle their own registration
-            if isinstance(cls.__dict__.get(key), ReadonlyFieldDescriptor):
-                continue
-            if (field_definition := SQLAlchemyFieldDefinition.from_typeform(key, ann)) is not None:
-                cls.__register_sqlalchemy_field_definition__(field_definition)
-
-    @classmethod
-    def __sqlalchemy_field_definitions__(cls) -> dict[str, SQLAlchemyFieldDefinition]:
-        if "_sqlalchemy_field_definitions" not in cls.__dict__:
-            cls._sqlalchemy_field_definitions = {}
-        return cls._sqlalchemy_field_definitions
-
-    @classmethod
-    def __mapped_fields__(cls) -> list[SQLAlchemyFieldDefinition]:
-        """Get field definitions for fields declared directly on this class.
-
-        Returns only fields that are both in the class's own annotations
-        (not inherited) and have SQLAlchemy field definitions registered.
-
-        Returns:
-            List of SQLAlchemyFieldDefinition for this class's own fields.
-        """
-        annotations = get_annotations(cls, eval_str=True, format=Format.VALUE)
-        return [
-            it
-            for it in cls.__sqlalchemy_field_definitions__().values()
-            if it.source_name in annotations
-        ]
+            canonical = canonicalise_typeform(cls, ann)
+            cls.__register_sqlcrucible_field__(key, canonical, ConversionStrategy.EAGER)
 
     @classmethod
     @cache
     def __to_sa_model_converters__(cls) -> list[FieldConverter]:
+        own_fields: dict[str, SQLCrucibleField] = cls.__dict__.get("__sqlcrucible_fields__") or {}
         return [
             *[
                 converter
@@ -232,19 +216,19 @@ class SQLCrucibleEntity:
             ],
             *[
                 FieldConverter(
-                    source_name=it.source_name,
-                    mapped_name=it.mapped_name,
-                    converter=get_to_sa_model_converter(cls, it),
+                    source_name=decl.source_name,
+                    mapped_name=decl.mapped_name,
+                    converter=get_to_sa_model_converter(cls, decl),
                 )
-                for it in cls.__mapped_fields__()
-                # Exclude readonly fields (defined via readonly_field descriptor)
-                if not it.readonly
+                for decl in own_fields.values()
+                if decl.conversion_strategy is ConversionStrategy.EAGER and not decl.excluded
             ],
         ]
 
     @classmethod
     @cache
     def __from_sa_model_converters__(cls) -> list[FieldConverter]:
+        own_fields: dict[str, SQLCrucibleField] = cls.__dict__.get("__sqlcrucible_fields__") or {}
         return [
             *[
                 converter
@@ -254,13 +238,12 @@ class SQLCrucibleEntity:
             ],
             *[
                 FieldConverter(
-                    source_name=it.source_name,
-                    mapped_name=it.mapped_name,
-                    converter=get_from_sa_model_converter(cls, it),
+                    source_name=decl.source_name,
+                    mapped_name=decl.mapped_name,
+                    converter=get_from_sa_model_converter(cls, decl),
                 )
-                for it in cls.__mapped_fields__()
-                # Exclude readonly fields (defined via readonly_field descriptor)
-                if not it.readonly
+                for decl in own_fields.values()
+                if decl.conversion_strategy is ConversionStrategy.EAGER and not decl.excluded
             ],
         ]
 
@@ -340,13 +323,30 @@ class SQLCrucibleEntity:
         return self.__sa_model__
 
     @classmethod
-    def __register_sqlalchemy_field_definition__(cls, field_def: SQLAlchemyFieldDefinition):
-        source_name = field_def.source_name
-        if source_name in cls.__sqlalchemy_field_definitions__():
+    def __register_sqlcrucible_field__(
+        cls,
+        source_name: str,
+        typeform: CanonicalisedTypeform,
+        conversion_strategy: ConversionStrategy = ConversionStrategy.EAGER,
+    ) -> None:
+        """Register a field's canonical type during class creation.
+
+        Used by ReadonlyFieldDescriptor.__set_name__ (DEFERRED) and
+        __init_subclass__ (EAGER) to build the master field registry.
+        """
+        defs = cls.__dict__.get("__sqlcrucible_fields__")
+        if defs is None:
+            defs = {}
+            cls.__sqlcrucible_fields__ = defs
+        if source_name in defs:
             logger.debug(
-                f"Multiple definition of SQLAlchemy field {source_name} in class {cls} and its bases; will prefer the latest"
+                f"Multiple definitions of SQLCrucible field for {source_name} in class {cls}; will prefer the latest"
             )
-        cls.__sqlalchemy_field_definitions__()[source_name] = field_def
+        defs[source_name] = SQLCrucibleField(
+            source_name=source_name,
+            typeform=typeform,
+            conversion_strategy=conversion_strategy,
+        )
 
 
 class SQLCrucibleBaseModel(BaseModel, SQLCrucibleEntity):

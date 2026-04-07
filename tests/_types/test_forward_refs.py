@@ -1,6 +1,7 @@
 """Tests for forward reference resolution utilities."""
 
 import pytest
+from typing import Annotated, get_args, get_origin
 
 from sqlcrucible._types.forward_refs import resolve_forward_refs
 
@@ -34,6 +35,19 @@ class Owner:
 def test_resolve_forward_refs(tp: object, expected: object) -> None:
     """Forward references are resolved in various type positions."""
     assert resolve_forward_refs(tp, Owner) == expected
+
+
+def test_resolve_preserves_annotated_metadata() -> None:
+    """Annotated metadata survives forward-ref resolution."""
+    sentinel = object()
+    tp = Annotated[list["Target"], sentinel]
+
+    resolved = resolve_forward_refs(tp, Owner)
+
+    assert get_origin(resolved) is Annotated
+    inner, *metadata = get_args(resolved)
+    assert inner == list[Target]
+    assert metadata == [sentinel]
 
 
 def test_resolve_already_resolved_type() -> None:

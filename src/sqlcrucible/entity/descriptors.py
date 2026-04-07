@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,8 +21,11 @@ from sqlcrucible.conversion.caching import _identity_map
 from sqlcrucible.entity.field_resolution import get_from_sa_model_converter
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import SQLAlchemyField
-from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
-from sqlcrucible._types.forward_refs import resolve_forward_refs
+from sqlcrucible.entity.field_definitions import (
+    ConversionStrategy,
+    canonicalise_typeform,
+    SQLCrucibleField,
+)
 from typing_extensions import get_annotations, Format
 
 if TYPE_CHECKING:
@@ -68,16 +70,16 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
         self._descriptor = descriptor
         self._sa_field = sa_field
         self._converter: Converter[Any, _T] | None = None
-        self._sa_field_info: SQLAlchemyFieldDefinition | None = None
+        self._sa_field_info: SQLCrucibleField | None = None
         self._name: str | None = None
         self._owner: type[_O] | None = None
 
     def __set_name__(self, owner: type[_O], name: str):
         """Called when the descriptor is assigned to a class attribute.
 
-        Registers the field definition with the entity class.
-        Forward references in the type are resolved lazily when the field
-        definition is actually accessed, not during class creation.
+        Registers the canonical type with the entity class so that
+        the field definition can be resolved later.
+        Forward references are deferred via LazyCanonicalisedTypeform.
 
         Args:
             owner: The entity class owning this field
@@ -89,24 +91,19 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
         # Build SQLAlchemyField from provided arguments or extract from annotation
         sa_field = self._sa_field
         if self._descriptor is not None:
-            # Merge descriptor into sa_field (or create new one if sa_field is None)
             sa_field = SQLAlchemyField.merge_all(
                 sa_field,
                 SQLAlchemyField(attr=self._descriptor),
             )
         elif sa_field is None:
-            # Try to extract from annotation
             sa_field = self._extract_sa_field_from_annotation(owner, name)
 
-        # Register a preliminary field definition without resolving forward refs yet.
-        # The type will contain unresolved forward refs, but that's OK - they'll be
-        # resolved when the automodel is generated (lazily) or when the field is accessed.
-        sa_field_info = SQLAlchemyFieldDefinition.from_sqlalchemy_field(
-            self._name, self._tp, sa_field
+        # Build the type to canonicalise: wrap with Annotated if there's an sa_field
+        typeform = Annotated[self._tp, sa_field] if sa_field is not None else self._tp
+        canonical = canonicalise_typeform(owner, typeform)
+        owner.__register_sqlcrucible_field__(
+            name, canonical, conversion_strategy=ConversionStrategy.DEFERRED
         )
-        # Mark as readonly so it's excluded from to/from SA model converters
-        sa_field_info = replace(sa_field_info, readonly=True)
-        owner.__register_sqlalchemy_field_definition__(sa_field_info)
 
     def _extract_sa_field_from_annotation(
         self, owner: type[_O], name: str
@@ -126,15 +123,11 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
         return SQLAlchemyField(attr=descriptor) if descriptor else None
 
     @property
-    def sa_field_info(self) -> SQLAlchemyFieldDefinition:
-        """Get the SQLAlchemy field definition for this descriptor.
-
-        This property resolves any forward references in the type, which requires
-        all referenced classes to be defined. It's safe to call after class creation
-        is complete.
+    def sa_field_info(self) -> SQLCrucibleField:
+        """Get the field definition for this descriptor.
 
         Returns:
-            The field definition with resolved types
+            The SQLCrucibleField with resolved types
 
         Raises:
             RuntimeError: If accessed before the descriptor is assigned to a class
@@ -144,11 +137,10 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
                 raise RuntimeError(
                     "Attempted to construct SQLAlchemyFieldInfo on `readonly_field` descriptor before descriptor is assigned to a field!"
                 )
-            # Resolve forward references using the owner class's context
-            resolved_tp = resolve_forward_refs(self._tp, self._owner)
-            self._sa_field_info = SQLAlchemyFieldDefinition.from_sqlalchemy_field(
-                self._name, resolved_tp, self._sa_field
+            fields: dict[str, SQLCrucibleField] = (
+                self._owner.__dict__.get("__sqlcrucible_fields__") or {}
             )
+            self._sa_field_info = fields[self._name]
         return self._sa_field_info
 
     @overload
