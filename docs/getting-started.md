@@ -18,41 +18,86 @@ uv add sqlcrucible
 
 Here's a complete example showing the typical workflow:
 
-```python
-from typing import Annotated
-from uuid import UUID, uuid4
+=== "Python 3.14+"
 
-from pydantic import Field
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session, mapped_column
+    ```python
+    from typing import Annotated
+    from uuid import UUID, uuid7
 
-from sqlcrucible import SAType, SQLCrucibleBaseModel
+    from pydantic import Field
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import Session, mapped_column
 
-# 1. Define your entity
-class Artist(SQLCrucibleBaseModel):
-    __sqlalchemy_params__ = {"__tablename__": "artist"}
+    from sqlcrucible import SAType, SQLCrucibleBaseModel
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
-    name: str
+    # 1. Define your entity
+    class Artist(SQLCrucibleBaseModel):
+        __sqlalchemy_params__ = {"__tablename__": "artist"}
 
-# 2. Create the database tables
-engine = create_engine("sqlite:///:memory:")
-SAType[Artist].__table__.metadata.create_all(engine)
+        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
+        name: str
 
-# 3. Create an entity and save it
-artist = Artist(name="Bob Dylan")
-with Session(engine) as session:
-    session.add(artist.to_sa_model())  # Convert to SQLAlchemy model
-    session.commit()
+    # 2. Create the database tables
+    engine = create_engine("sqlite:///:memory:")
+    SAType[Artist].__table__.metadata.create_all(engine)
 
-# 4. Query and convert back
-with Session(engine) as session:
-    sa_artist = session.scalar(
-        select(SAType[Artist]).where(SAType[Artist].name == "Bob Dylan")
-    )
-    artist = Artist.from_sa_model(sa_artist)  # Convert back to entity
-    print(artist.name)  # "Bob Dylan"
-```
+    # 3. Create an entity and save it
+    artist = Artist(name="Bob Dylan")
+    with Session(engine) as session:
+        session.add(artist.to_sa_model())  # Convert to SQLAlchemy model
+        session.commit()
+
+    # 4. Query and convert back
+    with Session(engine) as session:
+        sa_artist = session.scalar(
+            select(SAType[Artist]).where(SAType[Artist].name == "Bob Dylan")
+        )
+        artist = Artist.from_sa_model(sa_artist)  # Convert back to entity
+        print(artist.name)  # "Bob Dylan"
+    ```
+
+=== "Python < 3.14"
+
+    ```python
+    from typing import Annotated
+    from uuid import UUID
+
+    from uuid_utils.compat import uuid7
+
+    from pydantic import Field
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import Session, mapped_column
+
+    from sqlcrucible import SAType, SQLCrucibleBaseModel
+
+    # 1. Define your entity
+    class Artist(SQLCrucibleBaseModel):
+        __sqlalchemy_params__ = {"__tablename__": "artist"}
+
+        id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
+        name: str
+
+    # 2. Create the database tables
+    engine = create_engine("sqlite:///:memory:")
+    SAType[Artist].__table__.metadata.create_all(engine)
+
+    # 3. Create an entity and save it
+    artist = Artist(name="Bob Dylan")
+    with Session(engine) as session:
+        session.add(artist.to_sa_model())  # Convert to SQLAlchemy model
+        session.commit()
+
+    # 4. Query and convert back
+    with Session(engine) as session:
+        sa_artist = session.scalar(
+            select(SAType[Artist]).where(SAType[Artist].name == "Bob Dylan")
+        )
+        artist = Artist.from_sa_model(sa_artist)  # Convert back to entity
+        print(artist.name)  # "Bob Dylan"
+    ```
+
+!!! note "UUID7 on older Python versions"
+    UUID7 is preferred over UUID4 for database primary keys because its time-ordered values improve index performance. `uuid.uuid7` is available in the standard library from Python 3.14. On earlier versions, install [`uuid-utils`](https://pypi.org/project/uuid-utils/) and import with `from uuid_utils.compat import uuid7`. All remaining examples in these docs use the stdlib import for brevity.
 
 The `Artist` class is a standard Pydantic model — it works with FastAPI, has validation, and serializes to JSON. When you need to interact with the database, you explicitly convert to and from the SQLAlchemy model.
 
@@ -61,7 +106,7 @@ The `Artist` class is a standard Pydantic model — it works with FastAPI, has v
 Without SQLCrucible, you'd need to write equivalent code like this:
 
 ```python
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import mapped_column, DeclarativeBase, Mapped
 from typing import Any, Self
@@ -76,7 +121,7 @@ class ArtistSQLAlchemyModel(Base):
 class Artist(BaseModel):
     __sqlalchemy_type__: type[Any] = ArtistSQLAlchemyModel
 
-    id: UUID = Field(default_factory=uuid4)
+    id: UUID = Field(default_factory=uuid7)
     name: str
 
     def to_sa_model(self) -> ArtistSQLAlchemyModel:
@@ -107,7 +152,7 @@ from dataclasses import dataclass, field
 @dataclass
 class Artist(SQLCrucibleEntity):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = field(default_factory=uuid7)
     name: str
 ```
 

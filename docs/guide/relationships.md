@@ -6,7 +6,7 @@ Use `readonly_field` to define relationship fields that are loaded from the SQLA
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
@@ -15,12 +15,12 @@ from sqlcrucible import readonly_field
 
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
 
 class Track(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "track"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
     artist_id: Annotated[UUID, mapped_column(ForeignKey("artist.id"))]
 
@@ -81,7 +81,7 @@ from pydantic import computed_field
 
 class Track(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "track"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
     artist_id: Annotated[UUID, mapped_column(ForeignKey("artist.id"))]
 
@@ -131,7 +131,7 @@ first is not second  # True — different calls, different instances
 ```python
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
 
     # One-to-many: artist has many tracks
@@ -142,7 +142,7 @@ class Artist(SQLCrucibleBaseModel):
 
 class Track(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "track"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
     artist_id: Annotated[UUID, mapped_column(ForeignKey("artist.id"))]
 

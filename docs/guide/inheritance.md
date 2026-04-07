@@ -8,7 +8,7 @@ All subclasses share one table with a discriminator column:
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy import String
 from sqlalchemy.orm import mapped_column
@@ -20,7 +20,7 @@ class Animal(SQLCrucibleBaseModel):
         "__tablename__": "animal",
         "__mapper_args__": {"polymorphic_on": "type", "polymorphic_identity": "animal"},
     }
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     type: Annotated[str, mapped_column(String(50))]
     name: str
 
@@ -42,7 +42,7 @@ Each subclass has its own table with a foreign key to the parent:
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import mapped_column
@@ -54,7 +54,7 @@ class Animal(SQLCrucibleBaseModel):
         "__tablename__": "animal",
         "__mapper_args__": {"polymorphic_on": "type", "polymorphic_identity": "animal"},
     }
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     type: Annotated[str, mapped_column(String(50))]
     name: str
 
@@ -63,7 +63,7 @@ class Dog(Animal):
         "__tablename__": "dog",
         "__mapper_args__": {"polymorphic_identity": "dog"},
     }
-    id: Annotated[UUID, mapped_column(ForeignKey("animal.id"), primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(ForeignKey("animal.id"), primary_key=True)] = Field(default_factory=uuid7)
     bones_chewed: int | None = None
     type: Annotated[str, ExcludeSAField()] = Field(default="dog")
 ```
@@ -74,7 +74,7 @@ Each subclass is a completely independent table:
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy import String
 from sqlalchemy.orm import mapped_column
@@ -85,7 +85,7 @@ class Animal(SQLCrucibleBaseModel):
         "__abstract__": True,
         "__mapper_args__": {"polymorphic_on": "type"},
     }
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     type: Annotated[str, mapped_column(String(50))]
     name: str
 
@@ -95,7 +95,7 @@ class Dog(Animal):
         "__mapper_args__": {"polymorphic_identity": "dog", "concrete": True},
     }
     # Must redefine ALL columns for concrete table inheritance
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     type: Annotated[str, mapped_column(String(50))] = Field(default="dog")
     name: str
     bones_chewed: int | None = None
@@ -109,7 +109,7 @@ class Dog(Animal):
 When using inheritance, `from_sa_model()` automatically returns the correct subclass:
 
 ```python
-dog_sa = Dog.__sqlalchemy_type__(id=uuid4(), name="Fido", type="dog", bones_chewed=42)
+dog_sa = Dog.__sqlalchemy_type__(id=uuid7(), name="Fido", type="dog", bones_chewed=42)
 
 # Load via the base class — returns Dog, not Animal
 animal = Animal.from_sa_model(dog_sa)

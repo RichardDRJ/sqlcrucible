@@ -6,7 +6,7 @@ An entity is a class that serves as both a Pydantic model and a SQLAlchemy table
 
 ```python
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import UUID, uuid7
 from pydantic import Field
 from sqlalchemy.orm import mapped_column
 from sqlcrucible import SQLCrucibleBaseModel
@@ -14,7 +14,7 @@ from sqlcrucible import SQLCrucibleBaseModel
 class Artist(SQLCrucibleBaseModel):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: Annotated[str, mapped_column()]
 ```
 
@@ -32,12 +32,12 @@ class BaseEntity(SQLCrucibleBaseModel):
 
 class Artist(BaseEntity):
     __sqlalchemy_params__ = {"__tablename__": "artist"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     name: str
 
 class Album(BaseEntity):
     __sqlalchemy_params__ = {"__tablename__": "album"}
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     title: str
 ```
 
@@ -72,7 +72,7 @@ class User(SQLCrucibleBaseModel):
         ),
     }
 
-    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid7)
     email: str
 ```
 
