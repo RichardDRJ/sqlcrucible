@@ -1,6 +1,8 @@
 """Shared infrastructure for stub type-checking tests."""
 
 import json
+
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import tempfile
 from collections.abc import Sequence
@@ -196,17 +198,23 @@ def _run_ty_batch(
 
 @pytest.fixture(scope="session")
 def _typecheck_batch(stub_dir):
-    """Lazily run each type checker once on all collected snippets."""
-    cache: dict[str, dict[str, TypecheckOutcome]] = {}
+    """Run all type checkers in parallel on all collected snippets."""
+
+    runners = {
+        "pyright": _run_pyright_batch,
+        "ty": _run_ty_batch,
+    }
+
+    with ThreadPoolExecutor(max_workers=len(runners)) as pool:
+        futures = {
+            name: pool.submit(runner, _SNIPPET_REGISTRY, stub_dir)
+            for name, runner in runners.items()
+        }
+        cache = {name: future.result() for name, future in futures.items()}
 
     def get(checker: str) -> dict[str, TypecheckOutcome]:
         if checker not in cache:
-            if checker == "pyright":
-                cache[checker] = _run_pyright_batch(_SNIPPET_REGISTRY, stub_dir)
-            elif checker == "ty":
-                cache[checker] = _run_ty_batch(_SNIPPET_REGISTRY, stub_dir)
-            else:
-                raise ValueError(f"Unknown checker: {checker}")
+            raise ValueError(f"Unknown checker: {checker}")
         return cache[checker]
 
     return get
