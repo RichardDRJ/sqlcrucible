@@ -398,6 +398,18 @@ wheels = [
 ]
 
 [[package]]
+name = "hypothesis"
+version = "6.151.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/00/5b/039c095977004f2316225559d591c5a4c62b2e4d7a429db2dd01d37c3ec2/hypothesis-6.151.6.tar.gz", hash = "sha256:755decfa326c8c97a4c8766fe40509985003396442138554b0ae824f9584318f", size = 475846, upload-time = "2026-02-11T04:42:06.891Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/70/42760b369723f8b5aa6a21e5fae58809f503ca7ebb6da13b99f4de36305a/hypothesis-6.151.6-py3-none-any.whl", hash = "sha256:4e6e933a98c6f606b3e0ada97a750e7fff12277a40260b9300a05e7a5c3c5e2e", size = 543324, upload-time = "2026-02-11T04:42:04.025Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.11"
 source = { registry = "https://pypi.org/simple" }
@@ -1078,6 +1090,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
+]
+
+[[package]]
 name = "sqlalchemy"
 version = "2.0.45"
 source = { registry = "https://pypi.org/simple" }
@@ -1134,6 +1155,7 @@ depcheck = [
 ]
 dev = [
     { name = "deptry" },
+    { name = "hypothesis" },
     { name = "nox" },
     { name = "pyright" },
     { name = "pytest" },
@@ -1150,6 +1172,7 @@ lint = [
     { name = "ruff" },
 ]
 test = [
+    { name = "hypothesis" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1171,6 +1194,7 @@ requires-dist = [
 depcheck = [{ name = "deptry" }]
 dev = [
     { name = "deptry" },
+    { name = "hypothesis", specifier = ">=6.100.0" },
     { name = "nox", specifier = ">=2024.4.15" },
     { name = "pyright" },
     { name = "pytest", specifier = ">=8.0.0" },
@@ -1185,6 +1209,7 @@ docs = [
 ]
 lint = [{ name = "ruff" }]
 test = [
+    { name = "hypothesis", specifier = ">=6.100.0" },
     { name = "pyright" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-cov", specifier = ">=6.0.0" },

@@ -36,6 +36,7 @@ version-file = "src/sqlcrucible/_version.py"
 test = [
     "pytest>=8.0.0",
     "pytest-cov>=6.0.0",
+    "hypothesis>=6.100.0",
     "pyright",
     "ty",
 ]
@@ -78,6 +79,9 @@ exclude_lines = [
     "@overload",
 ]
 show_missing = true
+
+[tool.hypothesis]
+deadline = 400
 
 [tool.ruff]
 line-length = 100
