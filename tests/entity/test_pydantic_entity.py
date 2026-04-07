@@ -13,7 +13,7 @@ from sqlcrucible.entity.descriptors import readonly_field
 
 from datetime import timedelta
 
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 from sqlalchemy import MetaData, ForeignKey
 from sqlalchemy.orm import mapped_column, relationship
@@ -312,3 +312,20 @@ def test_model_json_schema_omits_readonly_descriptor_fields():
 
     assert "name" in schema["properties"]
     assert "artist" not in schema["properties"]
+
+
+def test_classvar_not_on_sa_model():
+    """ClassVar annotations are excluded from the generated SA model."""
+
+    class EntityWithClassVar(SQLCrucibleEntity, BaseModel):
+        __sqlalchemy_params__ = {"__tablename__": "classvar_test"}
+        id: Annotated[int, mapped_column(primary_key=True)]
+        name: Annotated[str, mapped_column()]
+        MAX_NAME_LENGTH: ClassVar[int] = 255
+
+    entity = EntityWithClassVar(id=1, name="Test")
+    sa_model = entity.to_sa_model()
+
+    assert sa_model.id == 1
+    assert sa_model.name == "Test"
+    assert not hasattr(sa_model, "MAX_NAME_LENGTH")

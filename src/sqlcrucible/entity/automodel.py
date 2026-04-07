@@ -9,7 +9,7 @@ import sqlalchemy.orm
 from sqlalchemy.orm.attributes import Mapped
 
 from sqlcrucible.entity.core import SQLAlchemyBase, SQLCrucibleEntity
-from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+from sqlcrucible.entity.field_definitions import SQLCrucibleField
 from sqlcrucible._types.forward_refs import resolve_forward_refs
 from sqlcrucible._types.transformer import (
     TypeTransformerChain,
@@ -77,14 +77,15 @@ def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     params = vars(source).get("__sqlalchemy_params__", {})
     base = _get_sa_base(source)
 
-    field_defs = source.__sqlalchemy_field_definitions__().values()
+    own_fields: dict[str, SQLCrucibleField] = source.__dict__.get("__sqlcrucible_fields__") or {}
+    field_defs = [decl for decl in own_fields.values() if not decl.excluded]
 
     # Determine which fields need type annotations based on SQLAlchemy's Mapped type.
     # Mapped represents attributes instrumented by the Mapper (columns, relationships),
     # which require annotations for SQLAlchemy to configure them. Non-Mapped descriptors
     # like hybrid_property and association_proxy are extensions that provide their own
     # functionality without mapper instrumentation, so they only need class attributes.
-    def needs_annotation(f: SQLAlchemyFieldDefinition) -> bool:
+    def needs_annotation(f: SQLCrucibleField) -> bool:
         return f.mapped_attr is None or isinstance(f.mapped_attr, Mapped)
 
     annotated_field_defs = [f for f in field_defs if needs_annotation(f)]
@@ -152,7 +153,7 @@ def _get_sa_base(annotation: type[SQLCrucibleEntity]) -> type[Any]:
 
 def _transform_field_type(
     owner: type[SQLCrucibleEntity],
-    field_def: SQLAlchemyFieldDefinition,
+    field_def: SQLCrucibleField,
 ) -> TypeTransformerResult:
     # Resolve any forward references in the source type first
     resolved_tp = resolve_forward_refs(field_def.source_tp, owner)

@@ -1,10 +1,15 @@
 """Internal metadata structures for entity field definitions."""
 
 from __future__ import annotations
+from sqlalchemy.util import partial
+from sqlcrucible._types.forward_refs import resolve_forward_refs
+from collections.abc import Callable
+from enum import Enum, auto
+from functools import cached_property
 
 import typing
-from dataclasses import dataclass, replace
-from typing import Annotated, Any, Self, get_args, get_origin
+from dataclasses import dataclass
+from typing import Annotated, Any, ClassVar, get_args, get_origin, ForwardRef
 
 import sqlalchemy.orm
 from sqlalchemy.orm import ORMDescriptor
@@ -88,12 +93,8 @@ def _extract_annotation_metadata(annotations: tuple[Any, ...]) -> AnnotationMeta
 
 
 @dataclass(frozen=True, slots=True)
-class CanonicalisedTypeform:
-    """Normalized representation of a type annotation.
-
-    This represents the result of processing a type annotation to extract
-    SQLAlchemy field configuration, custom converters, and the base type.
-    """
+class ConcreteCanonicalisedTypeform:
+    """Fully resolved representation of a type annotation."""
 
     tp: Any
     field: SQLAlchemyField | None
@@ -101,177 +102,174 @@ class CanonicalisedTypeform:
     to_sa_converter: Converter | None = None
     should_exclude: bool | None = None
 
+    def resolve(self) -> ConcreteCanonicalisedTypeform:
+        return self
 
-@dataclass(frozen=True, slots=True)
-class SQLAlchemyFieldDefinition:
-    """Complete specification for mapping an entity field to SQLAlchemy.
+    def map(
+        self, fn: Callable[[ConcreteCanonicalisedTypeform], ConcreteCanonicalisedTypeform]
+    ) -> CanonicalisedTypeform:
+        return fn(self)
 
-    This class captures all the information needed to map a field from the
-    entity class to the corresponding SQLAlchemy model attribute, including
-    custom converters and type information.
 
-    Attributes:
-        source_name: Name of the field in the entity class
-        source_tp: Type of the field in the entity class
-        mapped_name: Name of the attribute in the SQLAlchemy model
-        mapped_tp: Type of the attribute in the SQLAlchemy model (if specified)
-        mapped_attr: ORM descriptor instance (if specified), e.g. hybrid_property
-        from_sa_converter: Custom converter from SA to entity (if specified)
-        to_sa_converter: Custom converter from entity to SA (if specified)
-        readonly: Whether this field is read-only (not included in converters)
+class LazyCanonicalisedTypeform:
+    """Deferred representation wrapping a supplier that produces a concrete typeform."""
+
+    __slots__ = ["_supplier", "_resolved"]
+
+    def __init__(self, supplier: Callable[[], CanonicalisedTypeform]) -> None:
+        self._supplier = supplier
+
+    def resolve(self) -> ConcreteCanonicalisedTypeform:
+        if not hasattr(self, "_resolved"):
+            result = self._supplier()
+            # Unwrap if the supplier returned another lazy
+            while isinstance(result, LazyCanonicalisedTypeform):
+                result = result.resolve()
+            self._resolved = result
+        return self._resolved
+
+    def map(
+        self, fn: Callable[[ConcreteCanonicalisedTypeform], ConcreteCanonicalisedTypeform]
+    ) -> CanonicalisedTypeform:
+        return LazyCanonicalisedTypeform(lambda: fn(self.resolve()))
+
+
+CanonicalisedTypeform = ConcreteCanonicalisedTypeform | LazyCanonicalisedTypeform
+
+
+def _contains_forward_ref(tp: Any) -> bool:
+    """Check if any type arguments contain forward references (recursively)."""
+    return isinstance(tp, (str, ForwardRef)) or any(
+        _contains_forward_ref(inner) for inner in get_args(tp)
+    )
+
+
+def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
+    """Process a type annotation to extract SQLAlchemy mapping information.
+
+    Recursively unwraps type annotations to extract the base type,
+    SQLAlchemyField configurations, custom converters, and exclusion markers.
+
+    Supported type forms:
+        - Annotated[T, ...]: Extracts metadata from annotations, recurses on T
+        - Mapped[T]: SQLAlchemy's Mapped wrapper, recurses on T
+        - str/ForwardRef: Deferred resolution via LazyCanonicalisedTypeform
+        - Any other type: Returns as-is with no field configuration
+
+    Args:
+        owner: The class that owns the annotation (for forward ref resolution)
+        typeform: The type annotation to process
+
+    Returns:
+        A CanonicalisedTypeform containing the extracted base type,
+        merged field configuration, and any custom converters.
+    """
+    match get_origin(typeform), get_args(typeform):
+        # Annotated[T, metadata...] - extract SQLCrucible metadata from annotations
+        case typing.Annotated, (tp, *annotations):
+            # Extract and categorize SQLCrucible-specific metadata
+            meta = _extract_annotation_metadata(tuple(annotations))
+
+            # Recurse into the inner type to handle nested Annotated/Mapped
+            inner = canonicalise_typeform(owner, tp)
+
+            return inner.map(partial(_merge_annotated, meta=meta))
+
+        # Mapped[T] - SQLAlchemy's type wrapper, unwrap and recurse
+        case sqlalchemy.orm.Mapped, (tp):
+            return canonicalise_typeform(owner, tp)
+
+        # ClassVar - class-level annotation, not an instance field
+        case _ if (get_origin(typeform) or typeform) is ClassVar:
+            return ConcreteCanonicalisedTypeform(tp=typeform, field=None, should_exclude=True)
+
+        # Forward ref or parameterized type with forward refs in args (e.g. list["Employee"])
+        case _ if _contains_forward_ref(typeform):
+
+            def _resolve_parameterized() -> CanonicalisedTypeform:
+                tp = resolve_forward_refs(typeform, owner)
+                return canonicalise_typeform(owner, tp)
+
+            return LazyCanonicalisedTypeform(supplier=_resolve_parameterized)
+
+        # Plain type (str, int, CustomClass, etc.) - no unwrapping needed
+        case _:
+            return ConcreteCanonicalisedTypeform(tp=typeform, field=None)
+
+
+def _merge_annotated(
+    inner: ConcreteCanonicalisedTypeform,
+    meta: AnnotationMetadata,
+) -> ConcreteCanonicalisedTypeform:
+    """Merge annotation metadata with an inner resolved typeform."""
+    fields = [it for it in (inner.field, *meta.fields) if it]
+    field = SQLAlchemyField.merge_all(*fields)
+    base_tp = inner.tp
+    source_tp = Annotated[base_tp, *meta.other_annotations] if meta.other_annotations else base_tp
+    return ConcreteCanonicalisedTypeform(
+        tp=source_tp,
+        field=field,
+        from_sa_converter=meta.from_sa_converter,
+        to_sa_converter=meta.to_sa_converter,
+        should_exclude=meta.should_exclude,
+    )
+
+
+class ConversionStrategy(Enum):
+    """How a field's value is obtained during entity conversion."""
+
+    EAGER = auto()
+    """Converted during from_sa_model()/to_sa_model()."""
+
+    DEFERRED = auto()
+    """Loaded on-demand from SA model via descriptor (readonly_field)."""
+
+
+@dataclass
+class SQLCrucibleField:
+    """A registered field with its canonical type and conversion strategy.
+
+    Exposes resolved mapping properties (source_tp, mapped_name, etc.) via
+    cached properties that resolve the typeform and merge field metadata on
+    first access.
     """
 
     source_name: str
-    source_tp: Any
+    typeform: CanonicalisedTypeform
+    conversion_strategy: ConversionStrategy
 
-    mapped_name: str
-    mapped_tp: Any | None = None
+    @cached_property
+    def _resolved(self) -> ConcreteCanonicalisedTypeform:
+        return self.typeform.resolve()
 
-    mapped_attr: ORMDescriptor[Any] | None = None
+    @cached_property
+    def _merged_field(self) -> SQLAlchemyField:
+        return SQLAlchemyField.merge_all(self._resolved.field, SQLAlchemyField())
 
-    from_sa_converter: Converter | None = None
-    to_sa_converter: Converter | None = None
+    @property
+    def excluded(self) -> bool:
+        return self._resolved.should_exclude or False
 
-    readonly: bool = False
+    @property
+    def source_tp(self) -> Any:
+        return self._resolved.tp
 
-    @classmethod
-    def from_sqlalchemy_field(
-        cls, source_name: str, source_tp: Any, field: SQLAlchemyField | None
-    ) -> Self:
-        """Create a field definition from a source type and SQLAlchemyField annotation.
+    @property
+    def mapped_name(self) -> str:
+        return self._merged_field.name or self.source_name
 
-        Args:
-            source_name: Name of the field in the entity
-            source_tp: Type annotation of the field
-            field: Optional SQLAlchemyField configuration
+    @property
+    def mapped_tp(self) -> Any | None:
+        return self._merged_field.tp
 
-        Returns:
-            A complete SQLAlchemyFieldDefinition
-        """
-        canonicalised = cls._canonicalise_typeform(source_name, source_tp)
-        field = SQLAlchemyField.merge_all(canonicalised.field, field or SQLAlchemyField())
-        return cls.from_canonicalised(source_name, replace(canonicalised, field=field))
+    @property
+    def mapped_attr(self) -> ORMDescriptor[Any] | None:
+        return self._merged_field.attr
 
-    @classmethod
-    def from_typeform(cls, source_name: str, typeform: Any) -> Self | None:
-        """Create a field definition from a type annotation.
+    @property
+    def from_sa_converter(self) -> Converter | None:
+        return self._resolved.from_sa_converter
 
-        This is used for processing field annotations to determine if they should
-        be mapped to SQLAlchemy. Returns None if the annotation doesn't contain
-        SQLAlchemy mapping information.
-
-        Args:
-            source_name: Name of the field in the entity
-            typeform: Type annotation to process
-
-        Returns:
-            A SQLAlchemyFieldDefinition if mapping info found, None otherwise
-        """
-        canonicalised = cls._canonicalise_typeform(source_name, typeform)
-        if canonicalised.should_exclude:
-            return None
-
-        return cls.from_canonicalised(source_name, canonicalised)
-
-    @classmethod
-    def from_canonicalised(cls, source_name: str, canonicalised: CanonicalisedTypeform) -> Self:
-        """Create a field definition from a canonicalised typeform.
-
-        Args:
-            source_name: Name of the field in the entity
-            canonicalised: The canonicalised type information
-
-        Returns:
-            A complete SQLAlchemyFieldDefinition
-        """
-        field = SQLAlchemyField.merge_all(canonicalised.field, SQLAlchemyField())
-        return cls(
-            source_name=source_name,
-            source_tp=canonicalised.tp,
-            mapped_name=field.name or source_name,
-            mapped_tp=field.tp,
-            mapped_attr=field.attr,
-            from_sa_converter=canonicalised.from_sa_converter,
-            to_sa_converter=canonicalised.to_sa_converter,
-        )
-
-    @classmethod
-    def _canonicalise_typeform(cls, source_name: str, typeform: Any) -> CanonicalisedTypeform:
-        """Process a type annotation to extract SQLAlchemy mapping information.
-
-        This method recursively unwraps type annotations to extract:
-        - The base type (after stripping Annotated, Mapped wrappers)
-        - SQLAlchemyField configurations (name, type, attr overrides)
-        - Custom converters (ConvertFromSAWith, ConvertToSAWith)
-        - Exclusion markers (ExcludeSAField)
-
-        The method handles nested annotations by recursively processing inner types
-        and merging the results. This allows annotations to be composed in any order.
-
-        Supported type forms:
-            - Annotated[T, ...]: Extracts metadata from annotations, recurses on T
-            - Mapped[T]: SQLAlchemy's Mapped wrapper, recurses on T
-            - Any other type: Returns as-is with no field configuration
-
-        Example processing:
-            Input:  Annotated[str, mapped_column(), SQLAlchemyField(name="db_name")]
-            Output: CanonicalisedTypeform(
-                tp=str,
-                field=SQLAlchemyField(name="db_name"),
-                ...
-            )
-
-            Input:  Annotated[timedelta, mapped_column(), ConvertToSAWith(lambda x: x.total_seconds())]
-            Output: CanonicalisedTypeform(
-                tp=timedelta,
-                field=SQLAlchemyField(),
-                to_sa_converter=FunctionConverter(...),
-                ...
-            )
-
-        Args:
-            source_name: Name of the field (for error messages)
-            typeform: The type annotation to process
-
-        Returns:
-            A CanonicalisedTypeform containing the extracted base type,
-            merged field configuration, and any custom converters.
-        """
-        match get_origin(typeform), get_args(typeform):
-            # Case 1: Annotated[T, metadata...] - extract SQLCrucible metadata from annotations
-            case typing.Annotated, (tp, *annotations):
-                tp, *annotations = get_args(typeform)
-
-                # Extract and categorize SQLCrucible-specific metadata
-                meta = _extract_annotation_metadata(tuple(annotations))
-
-                # Recurse into the inner type to handle nested Annotated/Mapped
-                inner = cls._canonicalise_typeform(source_name, tp)
-                fields = [it for it in (inner.field, *meta.fields) if it]
-
-                # Merge all field configs, with later values taking precedence
-                field = SQLAlchemyField.merge_all(*fields)
-                # Reconstruct Annotated if there are non-SQLCrucible annotations to preserve
-                source_tp = Annotated[tp, *meta.other_annotations] if meta.other_annotations else tp
-
-                return CanonicalisedTypeform(
-                    tp=source_tp,
-                    field=field,
-                    from_sa_converter=meta.from_sa_converter,
-                    to_sa_converter=meta.to_sa_converter,
-                    should_exclude=meta.should_exclude,
-                )
-            # Case 2: Mapped[T] - SQLAlchemy's type wrapper, unwrap and recurse
-            case sqlalchemy.orm.Mapped, (tp):
-                inner = cls._canonicalise_typeform(source_name, tp)
-                field = SQLAlchemyField.merge_all(inner.field, SQLAlchemyField())
-                return CanonicalisedTypeform(
-                    tp=inner.tp,
-                    field=field,
-                    from_sa_converter=inner.from_sa_converter,
-                    to_sa_converter=inner.to_sa_converter,
-                )
-
-            # Case 3: Plain type (str, int, CustomClass, etc.) - no unwrapping needed
-            case _:
-                return CanonicalisedTypeform(tp=typeform, field=None)
+    @property
+    def to_sa_converter(self) -> Converter | None:
+        return self._resolved.to_sa_converter

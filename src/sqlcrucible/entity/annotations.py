@@ -30,7 +30,7 @@ class SQLAlchemyField:
     tp: Any | None = None
 
     @classmethod
-    def merge_all(cls, *fields: "SQLAlchemyField | None") -> "SQLAlchemyField":
+    def merge_all(cls, *fields: SQLAlchemyField | None) -> SQLAlchemyField:
         """Merge multiple SQLAlchemyField annotations, with later values taking precedence."""
         result = SQLAlchemyField()
         for field in fields:

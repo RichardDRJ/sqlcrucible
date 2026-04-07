@@ -21,7 +21,7 @@ from sqlcrucible._types.annotations import unwrap
 from sqlcrucible._types.forward_refs import evaluate_forward_refs
 
 if TYPE_CHECKING:
-    from sqlcrucible.entity.field_definitions import SQLAlchemyFieldDefinition
+    from sqlcrucible.entity.field_definitions import SQLCrucibleField
     from sqlcrucible.entity.core import SQLCrucibleEntity
 
 _T = TypeVar("_T")
@@ -36,7 +36,7 @@ class FieldConverter(Generic[_T, _S]):
     converter: Converter[_S, _T]
 
 
-def get_from_sa_model_converter(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> Converter:
+def get_from_sa_model_converter(cls: type[_E], field_def: SQLCrucibleField) -> Converter:
     if field_def.from_sa_converter:
         return field_def.from_sa_converter
 
@@ -53,7 +53,7 @@ def get_from_sa_model_converter(cls: type[_E], field_def: SQLAlchemyFieldDefinit
     return result
 
 
-def get_to_sa_model_converter(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> Converter:
+def get_to_sa_model_converter(cls: type[_E], field_def: SQLCrucibleField) -> Converter:
     if field_def.to_sa_converter:
         return field_def.to_sa_converter
 
@@ -104,7 +104,7 @@ def resolve_sa_field_type(sa_type: type, field_name: str) -> Any:
             return None
 
 
-def _get_sa_field_type(cls: type[_E], field_def: SQLAlchemyFieldDefinition) -> Any:
+def _get_sa_field_type(cls: type[_E], field_def: SQLCrucibleField) -> Any:
     if field_def.mapped_tp:
         return field_def.mapped_tp
 
