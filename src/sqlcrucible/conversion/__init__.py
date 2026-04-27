@@ -5,8 +5,10 @@ from sqlcrucible.conversion.noop import NoOpConverterFactory
 from sqlcrucible.conversion.registry import ConverterRegistry
 from sqlcrucible.conversion.sequences import SequenceConverterFactory
 from sqlcrucible.conversion.unions import UnionConverterFactory
+from sqlcrucible.conversion.unwrap import AnnotatedUnwrappingFactory
 
 default_registry = ConverterRegistry(
+    CachingConverterFactory(AnnotatedUnwrappingFactory()),
     CachingConverterFactory(NoOpConverterFactory()),
     CachingConverterFactory(LiteralConverterFactory()),
     CachingConverterFactory(DictConverterFactory()),

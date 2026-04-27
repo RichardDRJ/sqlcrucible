@@ -7,6 +7,7 @@ from typing import Any, get_args, get_origin
 
 import sqlalchemy.orm
 from sqlalchemy.orm.attributes import Mapped
+from typing import Annotated
 
 from sqlcrucible.entity.core import SQLAlchemyBase, SQLCrucibleEntity
 from sqlcrucible.entity.field_definitions import SQLCrucibleField
@@ -157,6 +158,13 @@ def _transform_field_type(
 ) -> TypeTransformerResult:
     # Resolve any forward references in the source type first
     resolved_tp = resolve_forward_refs(field_def.source_tp, owner)
+
+    # Strip Annotated wrappers — non-SA metadata (access-control markers, Pydantic
+    # validators, etc.) belongs on the entity side only. Leaving it in the SA model
+    # annotation prevents SQLAlchemy from correctly inferring relationship config
+    # such as uselist (e.g. Mapped[Annotated[list[X], meta]] yields uselist=False).
+    while get_origin(resolved_tp) is Annotated:
+        resolved_tp = get_args(resolved_tp)[0]
 
     match (get_origin(resolved_tp), get_args(resolved_tp)):
         case (sqlalchemy.orm.Mapped, _):
