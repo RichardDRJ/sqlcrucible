@@ -1,15 +1,21 @@
 """SAType utility for type-safe access to entity SQLAlchemy types."""
 
-from typing import Protocol, TypeVar, Any, TYPE_CHECKING
+from typing import Any, Protocol, TYPE_CHECKING, TypeVar
 
-_S = TypeVar("_S", covariant=True)
+_S = TypeVar("_S")
 
 
 class HasSAType(Protocol[_S]):
-    """Protocol for types that have a __sqlalchemy_type__ property."""
+    """Protocol for entity classes that expose ``__sqlalchemy_type__``.
 
-    @property
-    def __sqlalchemy_type__(self) -> _S: ...
+    The attribute is declared as ``ClassVar`` so that pyright accepts
+    matching against entity classes whose own declarations use the
+    same form (which SQLCrucibleBaseModel does). The metaclass
+    accessor takes the class itself (``type[HasSAType[_S]]``) and reads
+    the SA-type out at the class level.
+    """
+
+    __sqlalchemy_type__: _S
 
 
 class SATypeMeta(type):
