@@ -5,6 +5,7 @@ Generates type stubs that provide type checker support for SAType[Entity] access
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 
@@ -48,8 +49,6 @@ def _stub_path(root: Path, module_name: str) -> Path:
 
 def _package_exists_in_source(package_name: str) -> bool:
     """Check if a package exists in the source (not just as a stub)."""
-    import importlib.util
-
     try:
         spec = importlib.util.find_spec(package_name)
         return spec is not None and spec.submodule_search_locations is not None
