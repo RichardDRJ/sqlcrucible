@@ -5,11 +5,11 @@ non-SQLAlchemy metadata (e.g. access-control markers) alongside the
 relationship() descriptor.
 """
 
-from uuid import uuid4, UUID
 from typing import Annotated
+from uuid import UUID, uuid4
 
 from pydantic import Field
-from sqlalchemy import MetaData, ForeignKey
+from sqlalchemy import ForeignKey, MetaData, inspect
 from sqlalchemy.orm import mapped_column, relationship
 
 from sqlcrucible.entity.core import SQLCrucibleBaseModel
@@ -68,8 +68,6 @@ def test_relationship_field_with_non_sa_annotated_metadata_roundtrips():
 
 def test_sa_model_annotation_for_relationship_with_annotated_metadata_uses_list():
     """The SA model annotation for an Annotated relationship field should be Mapped[list[...]]."""
-    from sqlalchemy import inspect
-
     mapper = inspect(SAType[PostAnnotated])
     rel = next(r for r in mapper.relationships if r.key == "tags")
     assert rel.uselist is True
