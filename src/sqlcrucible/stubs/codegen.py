@@ -139,6 +139,9 @@ def construct_sa_type_stub(entities: list[type[SQLCrucibleEntity]]) -> str:
 
     return (
         f"{import_block}\n\n"
+        f"_S = typing.TypeVar('_S')\n\n"
+        f"class HasSAType(typing.Protocol[_S]):\n"
+        f"    __sqlalchemy_type__: _S\n\n"
         f"class SATypeMeta(type):\n"
         f"{overload_block}\n"
         f"    @typing.overload\n"
