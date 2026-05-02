@@ -9,6 +9,7 @@ from typing import (
     Callable,
     ClassVar,
     Generic,
+    Iterator,
     Literal,
     Self,
     TypeVar,
@@ -26,6 +27,11 @@ from sqlcrucible.entity.sa_conversion import (
     ToSAModelConverterFactory,
 )
 
+from sqlcrucible.entity.column_projection import (
+    ColumnProjection,
+    RelationshipProjection,
+    classify_field_converters,
+)
 from sqlcrucible.entity.field_resolution import (
     FieldConverter,
     get_from_sa_model_converter,
@@ -303,23 +309,88 @@ class SQLCrucibleEntity:
             identity_map[id(sa_model)] = result
             return result
 
+    @classmethod
+    @cache
+    def __classified_field_converters__(
+        cls,
+    ) -> tuple[list[ColumnProjection], list[RelationshipProjection]]:
+        """Cached partition of the to-SA converters into column projections
+        (for column-level outputs) and relationship projections (for the
+        nested-entity attributes the SA constructor accepts directly).
+
+        Built via :func:`classify_field_converters`, which consults the
+        SA mapper to dispatch each converter spec on the kind of property
+        its mapped name resolves to.
+        """
+        return classify_field_converters(cls)
+
+    @classmethod
+    def __column_projections__(cls) -> list[ColumnProjection]:
+        """Per-Pydantic-field projections onto SA columns. Plain fields
+        project to a single column; composite-backed fields decompose
+        into the underlying columns via SA's ``__composite_values__``
+        protocol. Excludes relationship-mapped fields."""
+        return cls.__classified_field_converters__()[0]
+
+    @classmethod
+    def __relationship_projections__(cls) -> list[RelationshipProjection]:
+        """Per-Pydantic-field projections onto SA relationship attributes.
+        Held aside from column projections so :meth:`to_column_dict`
+        consumers can ignore them when building bulk-INSERT payloads."""
+        return cls.__classified_field_converters__()[1]
+
+    def to_columns(self) -> Iterator[tuple[str, Any]]:
+        """Yield ``(column_name, value)`` pairs for every column-bound field
+        on this entity.
+
+        Plain fields yield a single pair; composite-backed fields yield
+        one pair per underlying column via SA's standard
+        ``__composite_values__`` protocol. Relationship-mapped fields
+        are excluded.
+
+        For joined-table inheritance the iteration spans every ancestor
+        table; consumers targeting a single table can post-filter via
+        ``Table.c``.
+        """
+        return (
+            (column_name, column_value)
+            for projection in self.__class__.__column_projections__()
+            for column_name, column_value in zip(
+                projection.column_names,
+                projection.extractor(getattr(self, projection.source_name)),
+                strict=True,
+            )
+        )
+
+    def to_column_dict(self) -> dict[str, Any]:
+        """Project this entity onto a flat ``{column_name: value}`` dict
+        suitable for direct ``insert(table).values(...)``. Thin wrapper
+        around :meth:`to_columns` for callers that need a dict."""
+        return dict(self.to_columns())
+
     def to_sa_model(self) -> Any:
         """Convert this entity to a SQLAlchemy model instance.
 
         Creates a new SQLAlchemy model populated with data from this entity,
-        applying any configured type converters for each field.
+        applying any configured type converters for each field. Internally
+        splices :meth:`to_columns` (column-shaped pairs, including
+        decomposed composites) with the relationship-projection chain
+        (nested-entity attributes), so the column-projection logic is a
+        single source of truth shared with bulk-insert consumers.
 
         Returns:
             A SQLAlchemy model instance ready to be added to a session.
         """
-        kwargs = {
-            conversion_spec.mapped_name: conversion_spec.converter.convert(value)
-            for conversion_spec in self.__class__.__to_sa_model_converters__()
-            for value in (getattr(self, conversion_spec.source_name),)
-        }
-
         sa_type = self.__class__.__sqlalchemy_type__
-        self.__sa_model__ = sa_type(**kwargs)
+        self.__sa_model__ = sa_type(
+            **dict(self.to_columns()),
+            **{
+                projection.mapped_name: projection.converter.convert(
+                    getattr(self, projection.source_name)
+                )
+                for projection in self.__class__.__relationship_projections__()
+            },
+        )
         return self.__sa_model__
 
     @classmethod
