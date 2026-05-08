@@ -182,7 +182,14 @@ class SQLCrucibleEntity:
     __sa_model__: SQLAlchemyModel | None = None
     __identity_map__: IdentityMap | None = None
 
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        # Forward ``**kwargs`` so ``__init_subclass__`` cooperators further up
+        # the MRO still run — most importantly ``typing.Generic.__init_subclass__``,
+        # which populates ``__parameters__``. Without the super() call, a class
+        # that inherits from both ``SQLCrucibleEntity`` and ``Generic[T]`` looks
+        # un-parameterised to Pydantic, which then refuses to subscript it
+        # ("does not inherit from typing.Generic").
+        super().__init_subclass__(**kwargs)
         if "__sqlalchemy_automodel__" not in cls.__dict__:
             cls.__sqlalchemy_automodel__ = lazyproperty(_construct_automodel)
 
