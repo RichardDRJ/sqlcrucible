@@ -72,7 +72,7 @@ class GenericContainer(_DBRoundTripBase, Generic[T]):
 
     __sqlalchemy_params__ = {"__tablename__": "_generic_container"}
 
-    id: Annotated[int, mapped_column(primary_key=True, autoincrement=True)] = None  # type: ignore[assignment]
+    id: Annotated[UUID, mapped_column(primary_key=True)] = Field(default_factory=uuid4)
     label: Annotated[str, mapped_column(nullable=False)]
 
 
