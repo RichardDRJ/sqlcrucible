@@ -67,6 +67,40 @@ def _public_fields(it: dict[str, Any]) -> dict[str, Any]:
     return {name: it[name] for name in names}
 
 
+def _transparent_parameterisation_origin(
+    source: type[SQLCrucibleEntity],
+) -> type[SQLCrucibleEntity] | None:
+    """If ``source`` is a Pydantic generic parameterisation (``Origin[Args...]``)
+    that adds no SQLAlchemy configuration of its own, return ``Origin``.
+
+    Such a class is transparent at the SQLAlchemy layer — same table, same
+    columns, same mapper — because the type parameters only constrain the
+    entity-side (Pydantic) field types, which the parameterised class already
+    carries in its own ``model_fields`` / converters. So it should reuse the
+    origin's automodel rather than mint a fresh one. Minting a fresh one is
+    not just wasteful: in single-table inheritance it lands as an identity-less
+    polymorphic intermediate (SQLAlchemy warns), and its ``__name__`` contains
+    ``[`` ``]`` which the stub generator can't emit as a valid identifier.
+
+    Returns ``None`` (build a fresh automodel as usual) when ``source`` adds
+    its own ``__sqlalchemy_params__``, ``__sqlalchemy_base__``, or registered
+    fields — e.g. a concrete subclass of a parameterised generic that supplies
+    its own ``polymorphic_identity``.
+    """
+    pydantic_meta = getattr(source, "__pydantic_generic_metadata__", None)
+    origin = pydantic_meta.get("origin") if pydantic_meta else None
+    is_parameterisation = origin is not None and origin is not source
+
+    own = vars(source)
+    adds_own_sa_config = bool(
+        own.get("__sqlalchemy_params__")
+        or own.get("__sqlalchemy_base__")
+        or own.get("__sqlcrucible_fields__")
+    )
+
+    return origin if is_parameterisation and not adds_own_sa_config else None
+
+
 def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     """Create a SQLAlchemy automodel class for an entity.
 
@@ -75,6 +109,9 @@ def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     mapper configuration, except when a cycle is detected (in which case string
     forward refs are used to break the cycle).
     """
+    if (origin := _transparent_parameterisation_origin(source)) is not None:
+        return origin.__sqlalchemy_type__
+
     params = vars(source).get("__sqlalchemy_params__", {})
     base = _get_sa_base(source)
 

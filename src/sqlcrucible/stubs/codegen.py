@@ -115,6 +115,19 @@ def specificity_order(entities: list[type[SQLCrucibleEntity]]) -> list[type[SQLC
     )
 
 
+def _is_parameterised_generic(entity: type) -> bool:
+    """A Pydantic generic parameterisation ``Origin[Args...]`` — created by
+    ``__class_getitem__`` with no class body of its own. Its automodel is the
+    origin's (see ``automodel._create_automodel``), so it needs no ``SAType``
+    overload: the origin's overload already covers it, since a parameterised
+    generic is a subtype of the unparameterised origin. Emitting one anyway
+    would also be malformed — ``fqn`` renders the type arguments inside the
+    subscript unqualified (the origin's ``__name__`` is literally
+    ``"Origin[Arg]"``)."""
+    origin = getattr(entity, "__pydantic_generic_metadata__", {}).get("origin")
+    return origin is not None and origin is not entity
+
+
 def construct_sa_type_stub(entities: list[type[SQLCrucibleEntity]]) -> str:
     """Construct a stub for SAType with @overload declarations.
 
@@ -125,6 +138,8 @@ def construct_sa_type_stub(entities: list[type[SQLCrucibleEntity]]) -> str:
     imports: set[str] = set()
     overloads: list[str] = []
     for entity in specificity_order(entities):
+        if _is_parameterised_generic(entity):
+            continue
         sa_type = entity.__sqlalchemy_type__
         imports.add(entity.__module__)
         imports.add(sa_type.__module__)
