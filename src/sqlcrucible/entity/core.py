@@ -21,7 +21,8 @@ from sqlalchemy.orm import DeclarativeBase
 from typing_extensions import Format, TypedDict, get_annotations
 
 from sqlcrucible.conversion import default_registry
-from sqlcrucible.conversion.registry import ConverterRegistry
+from sqlcrucible.conversion.context import ConversionContext
+from sqlcrucible.conversion.registry import Converter, ConverterRegistry
 from sqlcrucible.entity.sa_conversion import (
     FromSAModelConverterFactory,
     ToSAModelConverterFactory,
@@ -34,6 +35,7 @@ from sqlcrucible.entity.column_projection import (
 )
 from sqlcrucible.entity.field_resolution import (
     FieldConverter,
+    entity_field_type,
     get_from_sa_model_converter,
     get_to_sa_model_converter,
 )
@@ -184,7 +186,7 @@ class SQLCrucibleEntity:
 
     __sqlalchemy_automodel__: ClassVar[SQLAlchemyModelType]
     __sqlalchemy_type__: ClassVar[SQLAlchemyModelType] = SQLAlchemyBase
-    __sqlcrucible_fields__: ClassVar[dict[str, SQLCrucibleField] | None] = None
+    __own_sqlcrucible_fields__: ClassVar[dict[str, SQLCrucibleField] | None] = None
     __sa_model__: SQLAlchemyModel | None = None
     __identity_map__: IdentityMap | None = None
 
@@ -209,7 +211,7 @@ class SQLCrucibleEntity:
         # (from __future__ import annotations) and Python 3.14+ lazy annotations
         # (PEP 749), returning ForwardRef for unresolvable names. canonicalise_typeform
         # wraps these in LazyCanonicalisedTypeform for deferred resolution.
-        registered = cls.__dict__.get("__sqlcrucible_fields__") or {}
+        registered = cls.__dict__.get("__own_sqlcrucible_fields__") or {}
         for key, ann in get_annotations(cls, format=Format.FORWARDREF).items():
             if key in registered:
                 continue
@@ -218,47 +220,57 @@ class SQLCrucibleEntity:
 
     @classmethod
     @cache
-    def __to_sa_model_converters__(cls) -> list[FieldConverter]:
-        own_fields: dict[str, SQLCrucibleField] = cls.__dict__.get("__sqlcrucible_fields__") or {}
-        return [
-            *[
-                converter
+    def __sqlcrucible_fields__(cls) -> dict[str, SQLCrucibleField]:
+        """Every registered field for this class — those declared on it plus
+        those inherited from base entities, bases first so iteration order is
+        stable. A field re-declared on a subclass shadows the inherited one.
+
+        The decls carry the *declared* field types (a ``TypeVar`` stays a
+        ``TypeVar``); use :func:`entity_field_type` for the type resolved in a
+        concrete subclass's context."""
+        return {
+            **{
+                name: decl
                 for base in cls.__bases__[::-1]
                 if issubclass(base, SQLCrucibleEntity)
-                for converter in base.__to_sa_model_converters__()
-            ],
-            *[
-                FieldConverter(
-                    source_name=decl.source_name,
-                    mapped_name=decl.mapped_name,
-                    converter=get_to_sa_model_converter(cls, decl),
-                )
-                for decl in own_fields.values()
-                if decl.conversion_strategy is ConversionStrategy.EAGER and not decl.excluded
-            ],
+                for name, decl in base.__sqlcrucible_fields__().items()
+            },
+            **(cls.__dict__.get("__own_sqlcrucible_fields__") or {}),
+        }
+
+    @classmethod
+    def __field_converters__(
+        cls,
+        resolve_converter: Callable[[type[SQLCrucibleEntity], SQLCrucibleField], Converter],
+    ) -> list[FieldConverter]:
+        """Build the field converters for one conversion direction over every
+        eager field that isn't excluded from the SA model. Iterating
+        :meth:`__sqlcrucible_fields__` means inherited fields are included
+        automatically. The converter is resolved against the field's declaring
+        class (where its ``Mapped[...]`` annotation lives), while ``target_type``
+        is resolved against ``cls`` — so a converter inherited onto a concrete
+        generic specialisation sees the specialised entity-side field type
+        rather than the ``TypeVar`` it was declared with."""
+        return [
+            FieldConverter(
+                source_name=decl.source_name,
+                mapped_name=decl.mapped_name,
+                converter=resolve_converter(decl.owner, decl),
+                target_type=entity_field_type(cls, decl.source_name),
+            )
+            for decl in cls.__sqlcrucible_fields__().values()
+            if decl.conversion_strategy is ConversionStrategy.EAGER and not decl.excluded
         ]
 
     @classmethod
     @cache
+    def __to_sa_model_converters__(cls) -> list[FieldConverter]:
+        return cls.__field_converters__(get_to_sa_model_converter)
+
+    @classmethod
+    @cache
     def __from_sa_model_converters__(cls) -> list[FieldConverter]:
-        own_fields: dict[str, SQLCrucibleField] = cls.__dict__.get("__sqlcrucible_fields__") or {}
-        return [
-            *[
-                converter
-                for base in cls.__bases__[::-1]
-                if issubclass(base, SQLCrucibleEntity)
-                for converter in base.__from_sa_model_converters__()
-            ],
-            *[
-                FieldConverter(
-                    source_name=decl.source_name,
-                    mapped_name=decl.mapped_name,
-                    converter=get_from_sa_model_converter(cls, decl),
-                )
-                for decl in own_fields.values()
-                if decl.conversion_strategy is ConversionStrategy.EAGER and not decl.excluded
-            ],
-        ]
+        return cls.__field_converters__(get_from_sa_model_converter)
 
     @classmethod
     def from_sa_model(cls, sa_model: Any) -> Self:
@@ -305,9 +317,11 @@ class SQLCrucibleEntity:
     def _from_sa_model(cls, sa_model: Any) -> Self:
         with _identity_map() as identity_map:
             kwargs = {
-                conversion_spec.source_name: conversion_spec.converter.convert(value)
+                conversion_spec.source_name: conversion_spec.converter.convert(
+                    getattr(sa_model, conversion_spec.mapped_name),
+                    ConversionContext(target_type=conversion_spec.target_type),
+                )
                 for conversion_spec in cls.__from_sa_model_converters__()
-                for value in (getattr(sa_model, conversion_spec.mapped_name),)
             }
 
             result = cls(**kwargs)
@@ -393,7 +407,8 @@ class SQLCrucibleEntity:
             **dict(self.to_columns()),
             **{
                 projection.mapped_name: projection.converter.convert(
-                    getattr(self, projection.source_name)
+                    getattr(self, projection.source_name),
+                    ConversionContext(target_type=projection.target_type),
                 )
                 for projection in self.__class__.__relationship_projections__()
             },
@@ -410,12 +425,13 @@ class SQLCrucibleEntity:
         """Register a field's canonical type during class creation.
 
         Used by ReadonlyFieldDescriptor.__set_name__ (DEFERRED) and
-        __init_subclass__ (EAGER) to build the master field registry.
+        __init_subclass__ (EAGER) to populate this class's own field registry;
+        :meth:`__sqlcrucible_fields__` flattens these across the MRO.
         """
-        defs = cls.__dict__.get("__sqlcrucible_fields__")
+        defs = cls.__dict__.get("__own_sqlcrucible_fields__")
         if defs is None:
             defs = {}
-            cls.__sqlcrucible_fields__ = defs
+            cls.__own_sqlcrucible_fields__ = defs
         if source_name in defs:
             logger.debug(
                 f"Multiple definitions of SQLCrucible field for {source_name} in class {cls}; will prefer the latest"
@@ -424,6 +440,7 @@ class SQLCrucibleEntity:
             source_name=source_name,
             typeform=typeform,
             conversion_strategy=conversion_strategy,
+            owner=cls,
         )
 
 

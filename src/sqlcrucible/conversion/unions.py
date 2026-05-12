@@ -19,6 +19,7 @@ from collections.abc import Iterable, Sequence
 from types import UnionType
 from typing import Any, TypeVar, Union, get_args, get_origin
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.exceptions import ConversionError, NoConverterFoundError
 from sqlcrucible.conversion.noop import NoOpConverter
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
@@ -105,7 +106,7 @@ class UnionConverter(Converter[Any, Any]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return _is_union(source_tp) or _is_union(target_tp)
 
-    def convert(self, source: Any) -> Any:
+    def convert(self, source: Any, context: ConversionContext) -> Any:
         source_type = type(source)
         candidates = [
             conv
@@ -115,15 +116,15 @@ class UnionConverter(Converter[Any, Any]):
 
         for converter in candidates:
             try:
-                return converter.safe_convert(source)
+                return converter.safe_convert(source, context)
             except ConversionError:
                 continue
 
         raise NoConverterFoundError(source, self._target_tp)
 
-    def safe_convert(self, source: Any) -> Any:
+    def safe_convert(self, source: Any, context: ConversionContext) -> Any:
         # Union conversion always uses safe_convert internally
-        return self.convert(source)
+        return self.convert(source, context)
 
 
 class UnionConverterFactory(ConverterFactory[Any, Any]):

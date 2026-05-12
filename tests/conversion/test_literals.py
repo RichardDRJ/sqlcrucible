@@ -6,6 +6,8 @@ from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.literals import LiteralConverter, LiteralConverterFactory
 from sqlcrucible.conversion.registry import ConverterRegistry
 
+from tests.conversion.conftest import ANY_CONTEXT
+
 
 @pytest.mark.parametrize(
     ("source_tp", "target_tp"),
@@ -68,7 +70,7 @@ def test_literal_converter_factory_does_not_match_non_literal_types(source_tp, t
 )
 def test_literal_converter_returns_value_when_valid(value, target_tp):
     converter = LiteralConverter(target_tp)
-    assert converter.convert(value) is value
+    assert converter.convert(value, ANY_CONTEXT) is value
 
 
 @pytest.mark.parametrize(
@@ -84,7 +86,7 @@ def test_literal_converter_returns_value_when_valid(value, target_tp):
 def test_literal_converter_safe_convert_raises_error_when_value_not_in_literal(value, target_tp):
     converter = LiteralConverter(target_tp)
     with pytest.raises(TypeMismatchError) as exc_info:
-        converter.safe_convert(value)
+        converter.safe_convert(value, ANY_CONTEXT)
     assert exc_info.value.source is value
     assert exc_info.value.target_type is target_tp
 
@@ -92,7 +94,7 @@ def test_literal_converter_safe_convert_raises_error_when_value_not_in_literal(v
 def test_literal_converter_error_message_contains_allowed_values():
     converter = LiteralConverter(Literal["a", "b", "c"])
     with pytest.raises(TypeMismatchError) as exc_info:
-        converter.safe_convert("x")
+        converter.safe_convert("x", ANY_CONTEXT)
     assert "x" in str(exc_info.value)
     assert "'a'" in str(exc_info.value)
     assert "'b'" in str(exc_info.value)
@@ -104,7 +106,7 @@ def test_literal_converter_via_registry(registry: ConverterRegistry):
     target_tp = Literal["a", "b"]
     converter = registry.resolve(source_tp, target_tp)
     assert converter is not None
-    assert converter.convert("a") == "a"
+    assert converter.convert("a", ANY_CONTEXT) == "a"
 
 
 def test_literal_converter_via_registry_returns_none_when_not_subset(registry: ConverterRegistry):

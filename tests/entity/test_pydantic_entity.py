@@ -42,8 +42,8 @@ class Track(BaseTestEntity):
         timedelta,
         mapped_column(),
         SQLAlchemyField(name="length_seconds", tp=int),
-        ConvertToSAWith(lambda td: td.total_seconds()),
-        ConvertFromSAWith(lambda it: timedelta(seconds=it)),
+        ConvertToSAWith(lambda td, ctx: td.total_seconds()),
+        ConvertFromSAWith(lambda it, ctx: timedelta(seconds=it)),
     ]
     notes: str | None = None
 

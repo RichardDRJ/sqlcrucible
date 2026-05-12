@@ -21,6 +21,7 @@ from typing import (
 )
 from typing_extensions import is_typeddict, NoExtraItems
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 from sqlcrucible._types.annotations import TypeAnnotation, unwrap
 
@@ -167,18 +168,18 @@ class DictConverter(Converter[dict, dict]):
         if missing:
             raise TypeError(f"Missing required key '{missing}' for {self._target_info.tp}")
 
-    def convert(self, source: dict) -> dict:
+    def convert(self, source: dict, context: ConversionContext) -> dict:
         result = {
-            key: conv.convert(value)
+            key: conv.convert(value, context)
             for key, value in source.items()
             if (conv := self._get_converter(key))
         }
         self._check_required_fields(result)
         return result
 
-    def safe_convert(self, source: dict) -> dict:
+    def safe_convert(self, source: dict, context: ConversionContext) -> dict:
         result = {
-            key: conv.safe_convert(value)
+            key: conv.safe_convert(value, context)
             for key, value in source.items()
             if (conv := self._get_converter(key))
         }

@@ -19,6 +19,7 @@ from typing_extensions import get_annotations, Format
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible._types.annotations import unwrap
 from sqlcrucible._types.forward_refs import evaluate_forward_refs
+from sqlcrucible._types.params import get_type_params_for_base
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.field_definitions import SQLCrucibleField
@@ -34,6 +35,55 @@ class FieldConverter(Generic[_T, _S]):
     source_name: str
     mapped_name: str
     converter: Converter[_S, _T]
+    target_type: Any
+    """The resolved entity-side type of ``source_name`` — passed to the
+    converter as :attr:`ConversionContext.target_type`. Carried per
+    :class:`FieldConverter` (rather than baked into the converter) so an
+    inherited converter on a concrete generic specialisation still sees the
+    specialised type."""
+
+
+def _substitute_type_params(tp: Any, substitution: dict[Any, Any]) -> Any:
+    """Substitute type variables in ``tp`` using a ``TypeVar -> type`` map.
+
+    Bare type variables are looked up directly; parameterised forms
+    (``list[T]``, ``T | None``, ``Annotated[list[T], ...]``, ``dict[K, V]``, …)
+    are re-subscripted on their free parameters — every generic-alias form,
+    including ``types.UnionType``, supports that. Anything with no free
+    parameters is returned unchanged. Parameters absent from ``substitution``
+    are left in place (so partial specialisations stay partial)."""
+    if isinstance(tp, TypeVar):
+        return substitution.get(tp, tp)
+    free_params: tuple[Any, ...] = getattr(tp, "__parameters__", ())
+    if not free_params:
+        return tp
+    resolved = [substitution.get(param, param) for param in free_params]
+    return tp[tuple(resolved)] if len(resolved) > 1 else tp[resolved[0]]
+
+
+def entity_field_type(cls: type[SQLCrucibleEntity], source_name: str) -> Any:
+    """The resolved entity-side type of ``source_name`` on ``cls``.
+
+    For a Pydantic entity this is the substituted ``model_fields`` annotation.
+    For any other entity it's the type the field was declared with, with any
+    type variables bound by ``cls``'s generic specialisation substituted in —
+    so a concrete specialisation of a generic entity reports the specialised
+    type rather than the declared ``TypeVar``. Returns ``None`` if the field
+    isn't registered."""
+    model_fields = getattr(cls, "model_fields", None)
+    if model_fields is not None and source_name in model_fields:
+        return model_fields[source_name].annotation
+    decl = cls.__sqlcrucible_fields__().get(source_name)
+    if decl is None:
+        return None
+    owner_params = getattr(decl.owner, "__parameters__", ())
+    if not owner_params or decl.owner is cls:
+        return decl.source_tp
+    try:
+        owner_args = get_type_params_for_base(cls, decl.owner)
+    except TypeError:
+        return decl.source_tp
+    return _substitute_type_params(decl.source_tp, dict(zip(owner_params, owner_args, strict=True)))
 
 
 def get_from_sa_model_converter(cls: type[_E], field_def: SQLCrucibleField) -> Converter:
@@ -48,7 +98,7 @@ def get_from_sa_model_converter(cls: type[_E], field_def: SQLCrucibleField) -> C
             f"No converter found for field '{field_def.source_name}' in {cls.__name__}: "
             f"cannot convert from SQLAlchemy type {mapped_tp} to entity type {source_tp}.\n"
             f"Hint: Add a custom converter using ConvertFromSAWith:\n"
-            f"    {field_def.source_name}: Annotated[{source_tp}, ..., ConvertFromSAWith(lambda x: ...)]"
+            f"    {field_def.source_name}: Annotated[{source_tp}, ..., ConvertFromSAWith(lambda x, ctx: ...)]"
         )
     return result
 
@@ -65,7 +115,7 @@ def get_to_sa_model_converter(cls: type[_E], field_def: SQLCrucibleField) -> Con
             f"No converter found for field '{field_def.source_name}' in {cls.__name__}: "
             f"cannot convert from entity type {source_tp} to SQLAlchemy type {mapped_tp}.\n"
             f"Hint: Add a custom converter using ConvertToSAWith:\n"
-            f"    {field_def.source_name}: Annotated[{source_tp}, ..., ConvertToSAWith(lambda x: ...)]"
+            f"    {field_def.source_name}: Annotated[{source_tp}, ..., ConvertToSAWith(lambda x, ctx: ...)]"
         )
     return result
 

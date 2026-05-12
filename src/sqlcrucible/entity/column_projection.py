@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import inspect
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.registry import Converter
 
 if TYPE_CHECKING:
@@ -77,6 +78,9 @@ class RelationshipProjection:
     source_name: str
     mapped_name: str
     converter: Converter
+    target_type: Any
+    """Resolved entity-side type of ``source_name`` (the converter's
+    :attr:`ConversionContext.target_type`)."""
 
 
 def classify_field_converters(
@@ -101,9 +105,13 @@ def classify_field_converters(
     specs = list(cls.__to_sa_model_converters__())
 
     column_projections = [
-        _composite_projection(spec.source_name, spec.converter, composites[spec.mapped_name])
+        _composite_projection(
+            spec.source_name, spec.converter, spec.target_type, composites[spec.mapped_name]
+        )
         if spec.mapped_name in composites
-        else _column_projection(spec.source_name, spec.converter, columns[spec.mapped_name])
+        else _column_projection(
+            spec.source_name, spec.converter, spec.target_type, columns[spec.mapped_name]
+        )
         for spec in specs
         if spec.mapped_name in composites or spec.mapped_name in columns
     ]
@@ -112,6 +120,7 @@ def classify_field_converters(
             source_name=spec.source_name,
             mapped_name=spec.mapped_name,
             converter=spec.converter,
+            target_type=spec.target_type,
         )
         for spec in specs
         if spec.mapped_name not in composites and spec.mapped_name not in columns
@@ -120,12 +129,13 @@ def classify_field_converters(
 
 
 def _column_projection(
-    source_name: str, converter: Converter, column_property: Any
+    source_name: str, converter: Converter, target_type: Any, column_property: Any
 ) -> ColumnProjection:
     column_name = column_property.columns[0].name
+    context = ConversionContext(target_type=target_type)
 
     def extract(value: Any) -> tuple[Any, ...]:
-        return (converter.convert(value),)
+        return (converter.convert(value, context),)
 
     return ColumnProjection(
         source_name=source_name,
@@ -135,17 +145,18 @@ def _column_projection(
 
 
 def _composite_projection(
-    source_name: str, converter: Converter, composite_property: Any
+    source_name: str, converter: Converter, target_type: Any, composite_property: Any
 ) -> ColumnProjection:
     # ``CompositeProperty.columns`` is empty until mapper configure-time
     # resolves them (and even then is sometimes empty); ``.props`` is
     # the ColumnProperty list whose first column is what we want.
     column_names = tuple(prop.columns[0].name for prop in composite_property.props)
+    context = ConversionContext(target_type=target_type)
 
     def extract(value: Any) -> tuple[Any, ...]:
         if value is None:
             return (None,) * len(column_names)
-        converted = converter.convert(value)
+        converted = converter.convert(value, context)
         if converted is None:
             return (None,) * len(column_names)
         return tuple(converted.__composite_values__())

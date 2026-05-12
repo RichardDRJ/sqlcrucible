@@ -1,6 +1,7 @@
 from typing import Any, TypeVar, TYPE_CHECKING
 
 from sqlcrucible._types.annotations import unwrap, types_are_non_parameterised_and_equal
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 
 if TYPE_CHECKING:
@@ -22,11 +23,11 @@ class ToSAModelConverter(Converter[_E, Any]):
         )
         return source_matches_my_entity and target_matches_source_sa_type
 
-    def convert(self, source: _E) -> Any:
+    def convert(self, source: _E, context: ConversionContext) -> Any:
         return source.to_sa_model()
 
-    def safe_convert(self, source: _E) -> Any:
-        return self.convert(source)
+    def safe_convert(self, source: _E, context: ConversionContext) -> Any:
+        return self.convert(source, context)
 
 
 class ToSAModelConverterFactory(ConverterFactory[Any, Any]):
@@ -60,11 +61,11 @@ class FromSAModelConverter(Converter[_E, Any]):
         )
         return target_matches_my_entity and source_matches_target_sa_type
 
-    def convert(self, source: _E) -> Any:
+    def convert(self, source: _E, context: ConversionContext) -> Any:
         return self._sqlcrucible_entity.from_sa_model(source)
 
-    def safe_convert(self, source: _E) -> Any:
-        return self.convert(source)
+    def safe_convert(self, source: _E, context: ConversionContext) -> Any:
+        return self.convert(source, context)
 
 
 class FromSAModelConverterFactory(ConverterFactory[Any, Any]):

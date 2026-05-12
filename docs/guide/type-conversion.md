@@ -2,7 +2,7 @@
 
 ## Custom Type Converters
 
-Use `ConvertToSAWith` and `ConvertFromSAWith` to customize conversion between your entity and the SQLAlchemy model:
+Use `ConvertToSAWith` and `ConvertFromSAWith` to customize conversion between your entity and the SQLAlchemy model. The callable receives `(value, context)` — `context` is a `ConversionContext`, and `context.target_type` is the resolved entity-side field type:
 
 ```python
 from datetime import timedelta
@@ -19,10 +19,50 @@ class Track(SQLCrucibleBaseModel):
         timedelta,
         mapped_column(),
         SQLAlchemyField(name="length_seconds", tp=int),
-        ConvertToSAWith(lambda td: td.total_seconds()),
-        ConvertFromSAWith(lambda s: timedelta(seconds=s)),
+        ConvertToSAWith(lambda td, ctx: td.total_seconds()),
+        ConvertFromSAWith(lambda s, ctx: timedelta(seconds=s)),
     ]
 ```
+
+### `target_type` and generic entities
+
+`context.target_type` is the *resolved* type of the field — for a concrete specialisation of a generic entity it's the specialised type, not the `TypeVar`. So a JSON column holding a per-subclass Pydantic payload can be re-validated against the right model:
+
+```python
+from typing import Annotated, Generic, TypeVar
+from pydantic import BaseModel, TypeAdapter
+from sqlalchemy import JSON
+from sqlalchemy.orm import mapped_column
+from sqlcrucible import ConvertFromSAWith, ConvertToSAWith, ExcludeSAField, SQLCrucibleBaseModel
+
+P = TypeVar("P", bound=BaseModel)
+
+class Event(SQLCrucibleBaseModel, Generic[P]):
+    __sqlalchemy_params__ = {
+        "__tablename__": "event",
+        "__mapper_args__": {"polymorphic_on": "kind", "polymorphic_abstract": True},
+    }
+    payload: Annotated[
+        P | None,
+        mapped_column(JSON, nullable=True),
+        ConvertToSAWith(lambda v, ctx: None if v is None else v.model_dump(mode="json")),
+        ConvertFromSAWith(
+            lambda v, ctx: None if v is None else TypeAdapter(ctx.target_type).validate_python(v)
+        ),
+    ] = None
+
+class ArtistSignedPayload(BaseModel):
+    artist_name: str
+
+class ArtistSigned(Event[ArtistSignedPayload]):
+    __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "artist.signed"}}
+    kind: Annotated[str, ExcludeSAField()] = "artist.signed"
+
+# Loading an ArtistSigned row: ctx.target_type is `ArtistSignedPayload | None`,
+# so `payload` comes back as an ArtistSignedPayload, not the raw dict.
+```
+
+Custom `Converter` implementations (registered directly in a `ConverterRegistry`) follow the same shape — `convert(self, source, context)` and `safe_convert(self, source, context)`.
 
 ## How the Conversion System Works
 

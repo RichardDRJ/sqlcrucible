@@ -16,6 +16,8 @@ list[CustomType] needs a converter for CustomType).
 
 from typing import Any, Protocol, TypeVar, runtime_checkable
 
+from sqlcrucible.conversion.context import ConversionContext
+
 _I = TypeVar("_I", contravariant=True)
 _O = TypeVar("_O", covariant=True)
 
@@ -34,7 +36,7 @@ class Converter(Protocol[_I, _O]):
         """
         ...
 
-    def convert(self, source: _I) -> _O:
+    def convert(self, source: _I, context: ConversionContext) -> _O:
         """Convert a value from source type to target type (fast path).
 
         This method assumes the input is valid based on static type resolution.
@@ -43,13 +45,15 @@ class Converter(Protocol[_I, _O]):
 
         Args:
             source: The value to convert.
+            context: The conversion context for the field being converted
+                (carries the resolved field type, for converters that need it).
 
         Returns:
             The converted value.
         """
         ...
 
-    def safe_convert(self, source: _I) -> _O:
+    def safe_convert(self, source: _I, context: ConversionContext) -> _O:
         """Convert a value with runtime type validation.
 
         This method validates the input at runtime and raises ConversionError
@@ -58,6 +62,7 @@ class Converter(Protocol[_I, _O]):
 
         Args:
             source: The value to convert.
+            context: The conversion context for the field being converted.
 
         Returns:
             The converted value.

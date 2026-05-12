@@ -1,4 +1,4 @@
-from tests.conversion.conftest import SourceItem, TargetItem
+from tests.conversion.conftest import ANY_CONTEXT, SourceItem, TargetItem
 
 from typing import Any, cast
 
@@ -107,7 +107,7 @@ def test_nested_conversion_applied_in_union(
 ):
     conv = registry.resolve(source_tp, target_tp)
     assert conv is not None
-    actual_output = conv.convert(input_value)
+    actual_output = conv.convert(input_value, ANY_CONTEXT)
     assert actual_output == expected_output
 
 

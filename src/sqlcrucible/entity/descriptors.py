@@ -18,7 +18,8 @@ from typing import (
 from sqlalchemy.orm import ORMDescriptor
 
 from sqlcrucible.conversion.caching import _identity_map
-from sqlcrucible.entity.field_resolution import get_from_sa_model_converter
+from sqlcrucible.conversion.context import ConversionContext
+from sqlcrucible.entity.field_resolution import entity_field_type, get_from_sa_model_converter
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import SQLAlchemyField
 from sqlcrucible.entity.field_definitions import (
@@ -69,8 +70,16 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
         self._tp = tp
         self._descriptor = descriptor
         self._sa_field = sa_field
-        self._converter: Converter[Any, _T] | None = None
-        self._sa_field_info: SQLCrucibleField | None = None
+        # (field_info, from-SA converter, conversion context) per resolving
+        # entity class. Keyed by the *accessing* class rather than cached as a
+        # single value because one descriptor object is shared by every
+        # subclass of the class it's declared on — and on a concrete generic
+        # specialisation the converter/context must reflect the specialised
+        # field type, not the ``TypeVar``.
+        self._loaders: dict[
+            type[SQLCrucibleEntity],
+            tuple[SQLCrucibleField, Converter[Any, Any], ConversionContext],
+        ] = {}
         self._name: str | None = None
         self._owner: type[_O] | None = None
 
@@ -124,24 +133,36 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
 
     @property
     def sa_field_info(self) -> SQLCrucibleField:
-        """Get the field definition for this descriptor.
-
-        Returns:
-            The SQLCrucibleField with resolved types
+        """The field definition registered for this descriptor (carrying the
+        *declared* type — a ``TypeVar`` stays a ``TypeVar``).
 
         Raises:
             RuntimeError: If accessed before the descriptor is assigned to a class
         """
-        if self._sa_field_info is None:
-            if self._name is None or self._owner is None:
-                raise RuntimeError(
-                    "Attempted to construct SQLAlchemyFieldInfo on `readonly_field` descriptor before descriptor is assigned to a field!"
-                )
-            fields: dict[str, SQLCrucibleField] = (
-                self._owner.__dict__.get("__sqlcrucible_fields__") or {}
+        if self._name is None or self._owner is None:
+            raise RuntimeError(
+                "Attempted to access sa_field_info on a `readonly_field` descriptor "
+                "before it was assigned to a class attribute!"
             )
-            self._sa_field_info = fields[self._name]
-        return self._sa_field_info
+        return (self._owner.__dict__.get("__own_sqlcrucible_fields__") or {})[self._name]
+
+    def _loader(
+        self, owner: type[SQLCrucibleEntity]
+    ) -> tuple[SQLCrucibleField, Converter[Any, Any], ConversionContext]:
+        loader = self._loaders.get(owner)
+        if loader is None:
+            if self._name is None:
+                raise RuntimeError(
+                    "Attempted to load a `readonly_field` before it was assigned to a class attribute!"
+                )
+            field_info = owner.__sqlcrucible_fields__()[self._name]
+            loader = (
+                field_info,
+                get_from_sa_model_converter(field_info.owner, field_info),
+                ConversionContext(target_type=entity_field_type(owner, self._name)),
+            )
+            self._loaders[owner] = loader
+        return loader
 
     @overload
     def __get__(self, instance: None, owner: type, /) -> Self: ...
@@ -177,12 +198,10 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
         if cache is not None and self._name in cache:
             return cache[self._name]
 
-        field_info = self.sa_field_info
         resolved_owner = cast(
             type["SQLCrucibleEntity"], owner if owner is not None else type(instance)
         )
-        if self._converter is None:
-            self._converter = get_from_sa_model_converter(resolved_owner, field_info)
+        field_info, converter, context = self._loader(resolved_owner)
 
         model = instance.__sa_model__
         if model is None:
@@ -195,7 +214,7 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
             )
 
         with _identity_map(instance.__identity_map__):
-            result = self._converter.convert(getattr(model, field_info.mapped_name))
+            result = converter.convert(getattr(model, field_info.mapped_name), context)
 
         instance.__dict__.setdefault("__readonly_cache__", {})[self._name] = result
         return result

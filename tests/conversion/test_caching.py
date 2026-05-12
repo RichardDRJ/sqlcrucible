@@ -12,9 +12,12 @@ import pytest
 
 from sqlcrucible.conversion import default_registry
 from sqlcrucible.conversion.caching import CachingConverter, _identity_map
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.dicts import DictConverter, DictInfo
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.conversion.sequences import SequenceConverter
+
+from tests.conversion.conftest import ANY_CONTEXT
 
 
 @dataclass
@@ -36,11 +39,11 @@ class DoublingConverter(Converter[Source, Target]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return True
 
-    def convert(self, source: Source) -> Target:
+    def convert(self, source: Source, context: ConversionContext) -> Target:
         self.call_count += 1
         return Target(value=source.value * 2)
 
-    def safe_convert(self, source: Source) -> Target:
+    def safe_convert(self, source: Source, context: ConversionContext) -> Target:
         self.call_count += 1
         return Target(value=source.value * 2)
 
@@ -54,7 +57,7 @@ def test_cache_hit_returns_cached_result() -> None:
 
     with _identity_map() as identity_map:
         identity_map[id(source)] = cached
-        result = converter.convert(source)
+        result = converter.convert(source, ANY_CONTEXT)
 
     assert result is cached
     assert inner.call_count == 0
@@ -67,7 +70,7 @@ def test_cache_miss_delegates_to_inner() -> None:
     source = Source(5)
 
     with _identity_map():
-        result = converter.convert(source)
+        result = converter.convert(source, ANY_CONTEXT)
 
     assert result == Target(10)
     assert inner.call_count == 1
@@ -78,7 +81,7 @@ def test_no_identity_map_delegates_to_inner() -> None:
     inner = DoublingConverter()
     converter = CachingConverter(inner)
 
-    result = converter.convert(Source(3))
+    result = converter.convert(Source(3), ANY_CONTEXT)
 
     assert result == Target(6)
     assert inner.call_count == 1
@@ -93,7 +96,7 @@ def test_safe_convert_uses_cache() -> None:
 
     with _identity_map() as identity_map:
         identity_map[id(source)] = cached
-        result = converter.safe_convert(source)
+        result = converter.safe_convert(source, ANY_CONTEXT)
 
     assert result is cached
     assert inner.call_count == 0
@@ -110,7 +113,7 @@ def test_cache_hit_inside_sequence() -> None:
 
     with _identity_map() as identity_map:
         identity_map[id(cached_source)] = cached_target
-        result = seq.convert([cached_source, uncached_source])
+        result = seq.convert([cached_source, uncached_source], ANY_CONTEXT)
 
     assert result[0] is cached_target
     assert result[1] == Target(4)
@@ -133,7 +136,7 @@ def test_cache_hit_inside_dict() -> None:
 
     with _identity_map() as identity_map:
         identity_map[id(cached_source)] = cached_target
-        result = dict_conv.convert({"a": cached_source, "b": uncached_source})
+        result = dict_conv.convert({"a": cached_source, "b": uncached_source}, ANY_CONTEXT)
 
     assert result["a"] is cached_target
     assert result["b"] == Target(4)
@@ -153,8 +156,8 @@ def test_shared_source_across_entity_and_sequence() -> None:
 
     with _identity_map() as identity_map:
         identity_map[id(shared)] = cached_shared
-        direct = caching.convert(shared)
-        from_list = seq.convert([shared, other])
+        direct = caching.convert(shared, ANY_CONTEXT)
+        from_list = seq.convert([shared, other], ANY_CONTEXT)
 
     assert direct is cached_shared
     assert from_list[0] is cached_shared
@@ -189,8 +192,8 @@ def test_default_registry_sequence_converter_caches_by_identity() -> None:
     source = [1, 2, 3]
 
     with _identity_map():
-        first = converter.convert(source)
-        second = converter.convert(source)
+        first = converter.convert(source, ANY_CONTEXT)
+        second = converter.convert(source, ANY_CONTEXT)
 
     assert first is second
 
@@ -203,7 +206,7 @@ def test_default_registry_dict_converter_caches_by_identity() -> None:
     source = {"a": 1, "b": 2}
 
     with _identity_map():
-        first = converter.convert(source)
-        second = converter.convert(source)
+        first = converter.convert(source, ANY_CONTEXT)
+        second = converter.convert(source, ANY_CONTEXT)
 
     assert first is second

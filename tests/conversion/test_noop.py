@@ -4,6 +4,8 @@ from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.noop import NoOpConverter, NoOpConverterFactory
 from sqlcrucible.conversion.registry import ConverterRegistry
 
+from tests.conversion.conftest import ANY_CONTEXT
+
 
 @pytest.mark.parametrize(
     ("source_tp", "target_tp"),
@@ -50,7 +52,7 @@ def test_noop_converter_does_not_match_different_or_generic_types(source_tp, tar
 def test_noop_converter_returns_same_object(registry: ConverterRegistry, tp, value) -> None:
     conv = NoOpConverterFactory().converter(tp, tp, registry)
     assert conv is not None
-    assert conv.convert(value) is value
+    assert conv.convert(value, ANY_CONTEXT) is value
 
 
 @pytest.mark.parametrize(
@@ -68,7 +70,7 @@ def test_noop_converter_returns_same_object(registry: ConverterRegistry, tp, val
 def test_noop_converter_safe_convert_raises_typeerror_on_value_not_matching_type(tp, value) -> None:
     conv = NoOpConverter(tp)
     with pytest.raises(TypeMismatchError) as exc_info:
-        conv.safe_convert(value)
+        conv.safe_convert(value, ANY_CONTEXT)
     # Verify the exception contains useful context
     assert exc_info.value.source is value
     assert exc_info.value.target_type is tp

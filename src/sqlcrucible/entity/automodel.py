@@ -95,7 +95,7 @@ def _transparent_parameterisation_origin(
     adds_own_sa_config = bool(
         own.get("__sqlalchemy_params__")
         or own.get("__sqlalchemy_base__")
-        or own.get("__sqlcrucible_fields__")
+        or own.get("__own_sqlcrucible_fields__")
     )
 
     return origin if is_parameterisation and not adds_own_sa_config else None
@@ -115,7 +115,9 @@ def _create_automodel(source: type[SQLCrucibleEntity]) -> type[Any]:
     params = vars(source).get("__sqlalchemy_params__", {})
     base = _get_sa_base(source)
 
-    own_fields: dict[str, SQLCrucibleField] = source.__dict__.get("__sqlcrucible_fields__") or {}
+    own_fields: dict[str, SQLCrucibleField] = (
+        source.__dict__.get("__own_sqlcrucible_fields__") or {}
+    )
     field_defs = [decl for decl in own_fields.values() if not decl.excluded]
 
     # Determine which fields need type annotations based on SQLAlchemy's Mapped type.
