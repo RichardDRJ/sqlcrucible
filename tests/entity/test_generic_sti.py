@@ -100,6 +100,37 @@ def test_polymorphic_query_through_root_dispatches_to_subclass(engine):
     assert isinstance(row, SAType[Single])
 
 
+def test_from_sa_model_through_generic_root_yields_the_named_subclass(engine):
+    """A heterogeneous polymorphic query through the generic STI root, fed
+    back through ``Release.from_sa_model`` (not ``Single``/``Album``
+    directly), yields the named concrete subclass for each row — with its
+    ``details`` re-validated to that subclass's parameterised type. The
+    search has to walk past the transparent ``Release[SingleDetails]`` /
+    ``Release[AlbumDetails]`` parameterisations (which share the root's
+    automodel) to reach ``Single`` / ``Album``."""
+    with Session(engine) as session:
+        session.add(
+            Single(details=SingleDetails(a_side="Heroes", b_side="V-2 Schneider")).to_sa_model()
+        )
+        session.add(
+            Album(
+                details=AlbumDetails(track_titles=["Speed of Life", "Breaking Glass"])
+            ).to_sa_model()
+        )
+        session.commit()
+
+        rows = session.execute(select(SAType[Release])).scalars().all()
+
+    by_kind = {row.kind: Release.from_sa_model(row) for row in rows}
+
+    assert isinstance(by_kind["single"], Single)
+    assert by_kind["single"].details == SingleDetails(a_side="Heroes", b_side="V-2 Schneider")
+    assert isinstance(by_kind["album"], Album)
+    assert by_kind["album"].details == AlbumDetails(
+        track_titles=["Speed of Life", "Breaking Glass"]
+    )
+
+
 def test_stub_generation_is_well_formed(tmp_path: Path):
     """No bracket-named automodel class is created, so the generated
     stubs contain no class whose name has ``[`` ``]``; the parameterised

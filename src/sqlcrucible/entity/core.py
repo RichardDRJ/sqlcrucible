@@ -278,7 +278,11 @@ class SQLCrucibleEntity:
 
         This method converts a SQLAlchemy model instance into the corresponding
         entity class. For polymorphic models, it automatically selects the most
-        specific entity subclass that matches the model type.
+        specific entity subclass that matches the model type — searching the
+        whole subclass subtree, not just ``cls``'s direct children, so that a
+        polymorphic query through a *generic* STI root reaches the named
+        concrete subclasses rather than only the transparent ``Foo[X]``
+        parameterisations that share the root's automodel.
 
         Args:
             sa_model: A SQLAlchemy model instance to convert.
@@ -302,15 +306,18 @@ class SQLCrucibleEntity:
                 f"Hint: Make sure you're passing a SQLAlchemy model that was created from "
                 f"this entity class or one of its subclasses."
             )
-        best_subclasses = sorted(
-            cls.__subclasses__(),
-            key=lambda it: mro_distance(sa_model.__class__, it.__sqlalchemy_type__),
-        )
-        if best_subclasses:
-            best_match = best_subclasses[0]
-        else:
-            best_match = cls
+        sa_class = sa_model.__class__
 
+        def subtree(entity: type[Any]) -> Iterator[type[Any]]:
+            yield entity
+            for subclass in entity.__subclasses__():
+                yield from subtree(subclass)
+
+        best_match = min(
+            (entity for entity in subtree(cls) if issubclass(sa_class, entity.__sqlalchemy_type__)),
+            key=lambda entity: mro_distance(sa_class, entity.__sqlalchemy_type__),
+            default=cls,
+        )
         return best_match._from_sa_model(sa_model)
 
     @classmethod
