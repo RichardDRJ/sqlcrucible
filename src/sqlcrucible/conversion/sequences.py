@@ -16,6 +16,7 @@ Example:
 
 from typing import Any, Sequence, get_args, get_origin
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 from sqlcrucible._types.params import get_type_params_for_base
 
@@ -58,11 +59,11 @@ class SequenceConverter(Converter[Sequence, KnownSequenceType]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return True
 
-    def convert(self, source: Sequence) -> Any:
-        return self._target(self._inner.convert(it) for it in source)
+    def convert(self, source: Sequence, context: ConversionContext) -> Any:
+        return self._target(self._inner.convert(it, context) for it in source)
 
-    def safe_convert(self, source: Sequence) -> Any:
-        return self._target(self._inner.safe_convert(it) for it in source)
+    def safe_convert(self, source: Sequence, context: ConversionContext) -> Any:
+        return self._target(self._inner.safe_convert(it, context) for it in source)
 
 
 class SequenceConverterFactory(ConverterFactory[Sequence, KnownSequenceType]):

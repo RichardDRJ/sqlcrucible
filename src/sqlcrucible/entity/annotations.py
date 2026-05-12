@@ -8,8 +8,15 @@ from typing import Any
 
 from sqlalchemy.orm import ORMDescriptor
 
-from sqlcrucible.conversion.function import FunctionConverter
-from sqlcrucible.conversion.registry import Converter
+from sqlcrucible.conversion.context import ConversionContext
+
+__all__ = [
+    "SQLAlchemyField",
+    "ExcludeSAField",
+    "ConvertFromSAWith",
+    "ConvertToSAWith",
+    "ConversionContext",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,39 +56,48 @@ class ExcludeSAField:
     value: bool = True
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ConvertFromSAWith:
-    """Annotation specifying custom converter from SQLAlchemy to entity.
+    """Annotation specifying a custom converter from SQLAlchemy to entity.
 
-    Use this annotation to provide a custom conversion function when loading
-    values from SQLAlchemy models into entity instances.
+    The callable receives ``(value, context)``. ``context.target_type`` is the
+    resolved entity-side field type — for a concrete specialisation of a generic
+    entity it's the specialised type on the subclass, not the ``TypeVar`` — so a
+    converter can validate against it without having to guess.
 
     Example:
         ```python
         from typing import Annotated
+        from pydantic import TypeAdapter
 
 
         class MyEntity(SQLCrucibleEntity):
             created_at: Annotated[
-                datetime, mapped_column(), ConvertFromSAWith(lambda dt: dt.astimezone(timezone.utc))
+                datetime,
+                mapped_column(),
+                ConvertFromSAWith(lambda dt, ctx: dt.astimezone(timezone.utc)),
+            ]
+            payload: Annotated[
+                SomeModel | None,
+                mapped_column(JSON),
+                ConvertFromSAWith(
+                    lambda v, ctx: (
+                        None if v is None else TypeAdapter(ctx.target_type).validate_python(v)
+                    )
+                ),
             ]
         ```
     """
 
-    fn: Callable[[Any], Any]
-
-    @property
-    def converter(self) -> Converter:
-        """Get the Converter instance for this function."""
-        return FunctionConverter(self.fn)
+    fn: Callable[[Any, ConversionContext], Any]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ConvertToSAWith:
-    """Annotation specifying custom converter from entity to SQLAlchemy.
+    """Annotation specifying a custom converter from entity to SQLAlchemy.
 
-    Use this annotation to provide a custom conversion function when saving
-    entity values into SQLAlchemy models.
+    The callable receives ``(value, context)``. ``context.target_type`` is the
+    resolved entity-side field type of the value being converted.
 
     Example:
         ```python
@@ -90,14 +106,11 @@ class ConvertToSAWith:
 
         class MyEntity(SQLCrucibleEntity):
             created_at: Annotated[
-                datetime, mapped_column(), ConvertToSAWith(lambda dt: dt.astimezone(timezone.utc))
+                datetime,
+                mapped_column(),
+                ConvertToSAWith(lambda dt, ctx: dt.astimezone(timezone.utc)),
             ]
         ```
     """
 
-    fn: Callable[[Any], Any]
-
-    @property
-    def converter(self) -> Converter:
-        """Get the Converter instance for this function."""
-        return FunctionConverter(self.fn)
+    fn: Callable[[Any, ConversionContext], Any]

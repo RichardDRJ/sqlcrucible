@@ -10,6 +10,8 @@ from hypothesis import given
 from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.literals import LiteralConverter, LiteralConverterFactory
 
+from tests.conversion.conftest import ANY_CONTEXT
+
 from tests.strategies import (
     literal_non_subset_pair,
     literal_subset_pair,
@@ -55,7 +57,7 @@ def test_convert_is_identity(data):
 
     converter = LiteralConverter(target_tp)
     for value in source_values:
-        assert converter.convert(value) is value
+        assert converter.convert(value, ANY_CONTEXT) is value
 
 
 @given(data=literal_subset_pair())
@@ -65,7 +67,7 @@ def test_safe_convert_accepts_subset_values(data):
 
     converter = LiteralConverter(target_tp)
     for value in source_values:
-        assert converter.safe_convert(value) is value
+        assert converter.safe_convert(value, ANY_CONTEXT) is value
 
 
 @given(data=literal_non_subset_pair())
@@ -77,4 +79,4 @@ def test_safe_convert_rejects_values_not_in_target(data):
     converter = LiteralConverter(target_tp)
     for value in extra_values:
         with pytest.raises(TypeMismatchError):
-            converter.safe_convert(value)
+            converter.safe_convert(value, ANY_CONTEXT)

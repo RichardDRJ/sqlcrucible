@@ -14,6 +14,7 @@ from typing import Annotated, Any, ClassVar, get_args, get_origin, ForwardRef
 import sqlalchemy.orm
 from sqlalchemy.orm import ORMDescriptor
 
+from sqlcrucible.conversion.function import FunctionConverter
 from sqlcrucible.conversion.registry import Converter
 from sqlcrucible.entity.annotations import (
     ConvertFromSAWith,
@@ -74,9 +75,9 @@ def _extract_annotation_metadata(annotations: tuple[Any, ...]) -> AnnotationMeta
             # in annotations become class attributes on the SA model
             fields.append(SQLAlchemyField(attr=arg))
         elif isinstance(arg, ConvertFromSAWith):
-            from_sa_converter = arg.converter
+            from_sa_converter = FunctionConverter(arg.fn)
         elif isinstance(arg, ConvertToSAWith):
-            to_sa_converter = arg.converter
+            to_sa_converter = FunctionConverter(arg.fn)
         elif isinstance(arg, ExcludeSAField):
             should_exclude = arg.value
         else:
@@ -237,6 +238,12 @@ class SQLCrucibleField:
     source_name: str
     typeform: CanonicalisedTypeform
     conversion_strategy: ConversionStrategy
+    owner: Any
+    """The entity class that declared this field. Converter resolution uses it
+    (not the accessing subclass) so the SA-side type is read from the automodel
+    where the field's ``Mapped[...]`` annotation actually lives — which matters
+    for generic fields, whose annotation carries the (unsubstituted) ``TypeVar``
+    on the declaring class's automodel only."""
 
     @cached_property
     def _resolved(self) -> ConcreteCanonicalisedTypeform:

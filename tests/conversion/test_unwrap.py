@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped
 
 from sqlcrucible.conversion.registry import ConverterRegistry
 from sqlcrucible.conversion.unwrap import AnnotatedUnwrappingFactory
-from tests.conversion.conftest import SourceItem, TargetItem
+from tests.conversion.conftest import ANY_CONTEXT, SourceItem, TargetItem
 
 
 @pytest.mark.parametrize(
@@ -53,7 +53,7 @@ def test_delegates_to_registry_with_unwrapped_types(registry: ConverterRegistry)
         registry,
     )
     assert converter is not None
-    result = converter.convert(SourceItem(1))
+    result = converter.convert(SourceItem(1), ANY_CONTEXT)
     assert result == TargetItem(2)
 
 
@@ -61,7 +61,7 @@ def test_registry_resolves_annotated_source_via_unwrapping(registry: ConverterRe
     unwrapping_registry = ConverterRegistry(AnnotatedUnwrappingFactory(), *registry)
     conv = unwrapping_registry.resolve(Annotated[SourceItem, "marker"], TargetItem)
     assert conv is not None
-    assert conv.convert(SourceItem(3)) == TargetItem(6)
+    assert conv.convert(SourceItem(3), ANY_CONTEXT) == TargetItem(6)
 
 
 def test_registry_resolves_annotated_list_via_unwrapping(registry: ConverterRegistry):
@@ -71,11 +71,14 @@ def test_registry_resolves_annotated_list_via_unwrapping(registry: ConverterRegi
         list[TargetItem],
     )
     assert conv is not None
-    assert conv.convert([SourceItem(1), SourceItem(2)]) == [TargetItem(2), TargetItem(4)]
+    assert conv.convert([SourceItem(1), SourceItem(2)], ANY_CONTEXT) == [
+        TargetItem(2),
+        TargetItem(4),
+    ]
 
 
 def test_registry_resolves_mapped_source_via_unwrapping(registry: ConverterRegistry):
     unwrapping_registry = ConverterRegistry(AnnotatedUnwrappingFactory(), *registry)
     conv = unwrapping_registry.resolve(Mapped[SourceItem], TargetItem)
     assert conv is not None
-    assert conv.convert(SourceItem(5)) == TargetItem(10)
+    assert conv.convert(SourceItem(5), ANY_CONTEXT) == TargetItem(10)

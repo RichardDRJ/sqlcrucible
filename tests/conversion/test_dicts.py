@@ -6,7 +6,7 @@ import pytest
 
 from sqlcrucible.conversion.registry import ConverterRegistry
 from sqlcrucible.conversion.dicts import DictConverterFactory, DictInfo
-from tests.conversion.conftest import SourceItem, TargetItem
+from tests.conversion.conftest import ANY_CONTEXT, SourceItem, TargetItem
 
 
 class PersonDict(TypedDict):
@@ -99,7 +99,7 @@ def test_dict_to_dict_converts_correctly(
 ) -> None:
     conv = registry.resolve(source_tp, target_tp)
     assert conv is not None
-    actual_output = conv.convert(input_value)
+    actual_output = conv.convert(input_value, ANY_CONTEXT)
     assert actual_output == expected_output
 
 
@@ -108,7 +108,7 @@ def test_dict_to_dict_creates_new_reference(registry: ConverterRegistry) -> None
     conv = registry.resolve(dict[str, int], dict[str, int])
     assert conv is not None
     original = {"a": 1, "b": 2}
-    result = conv.convert(original)
+    result = conv.convert(original, ANY_CONTEXT)
     assert result == original
     assert result is not original
 
@@ -137,14 +137,14 @@ def test_unparameterized_dict_to_nested_typeddict_returns_none(
 def test_typeddict_to_plain_dict(registry: ConverterRegistry):
     converter = registry.resolve(PersonDict, dict)
     assert converter is not None
-    result = converter.convert({"name": "Alice", "age": 30})
+    result = converter.convert({"name": "Alice", "age": 30}, ANY_CONTEXT)
     assert result == {"name": "Alice", "age": 30}
 
 
 def test_typeddict_to_parameterized_dict(registry: ConverterRegistry):
     converter = registry.resolve(PersonDict, dict[str, Any])
     assert converter is not None
-    result = converter.convert({"name": "Alice", "age": 30})
+    result = converter.convert({"name": "Alice", "age": 30}, ANY_CONTEXT)
     assert result == {"name": "Alice", "age": 30}
 
 
@@ -153,7 +153,7 @@ def test_typeddict_to_dict_creates_new_reference(registry: ConverterRegistry):
     converter = registry.resolve(PersonDict, dict)
     assert converter is not None
     original: PersonDict = {"name": "Alice", "age": 30}
-    result = converter.convert(original)
+    result = converter.convert(original, ANY_CONTEXT)
     assert result == original
     assert result is not original
 
@@ -162,7 +162,7 @@ def test_typeddict_to_same_typeddict_creates_copy(registry: ConverterRegistry):
     converter = registry.resolve(PersonDict, PersonDict)
     assert converter is not None
     original: PersonDict = {"name": "Alice", "age": 30}
-    result = converter.convert(original)
+    result = converter.convert(original, ANY_CONTEXT)
     assert result == original
     assert result is not original
 
@@ -170,7 +170,7 @@ def test_typeddict_to_same_typeddict_creates_copy(registry: ConverterRegistry):
 def test_typeddict_to_compatible_typeddict(registry: ConverterRegistry):
     converter = registry.resolve(PersonDict, PartialDict)
     assert converter is not None
-    result = converter.convert({"name": "Alice", "age": 30})
+    result = converter.convert({"name": "Alice", "age": 30}, ANY_CONTEXT)
     assert result == {"name": "Alice", "age": 30}
 
 
@@ -178,14 +178,14 @@ def test_partial_typeddict_to_total_missing_required(registry: ConverterRegistry
     converter = registry.resolve(PartialDict, PersonDict)
     assert converter is not None
     with pytest.raises(TypeError) as exc_info:
-        converter.convert({"name": "Alice"})
+        converter.convert({"name": "Alice"}, ANY_CONTEXT)
     assert "age" in str(exc_info.value)
 
 
 def test_partial_typeddict_to_total_with_all_fields(registry: ConverterRegistry):
     converter = registry.resolve(PartialDict, PersonDict)
     assert converter is not None
-    result = converter.convert({"name": "Alice", "age": 30})
+    result = converter.convert({"name": "Alice", "age": 30}, ANY_CONTEXT)
     assert result == {"name": "Alice", "age": 30}
 
 

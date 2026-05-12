@@ -12,6 +12,7 @@ Example:
 
 from typing import Any, Literal, get_args, get_origin
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 from sqlcrucible._types.annotations import unwrap
@@ -62,10 +63,10 @@ class LiteralConverter(Converter[Any, Any]):
         target_values = _get_literal_values(target_tp)
         return source_values <= target_values
 
-    def convert(self, source: Any) -> Any:
+    def convert(self, source: Any, context: ConversionContext) -> Any:
         return source
 
-    def safe_convert(self, source: Any) -> Any:
+    def safe_convert(self, source: Any, context: ConversionContext) -> Any:
         if source not in self._allowed_values:
             raise TypeMismatchError(
                 source,

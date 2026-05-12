@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Generator, TypeVar, Generic
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.registry import Converter, ConverterFactory, ConverterRegistry
 
 IdentityMap = dict[int, Any]
@@ -45,16 +46,16 @@ class CachingConverter(Generic[_T, _R], Converter[_T, _R]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return self._inner.matches(source_tp, target_tp)
 
-    def convert(self, source: _T) -> _R:
+    def convert(self, source: _T, context: ConversionContext) -> _R:
         with _identity_map() as identity_map:
             if id(source) not in identity_map:
-                identity_map[id(source)] = self._inner.convert(source)
+                identity_map[id(source)] = self._inner.convert(source, context)
             return identity_map[id(source)]
 
-    def safe_convert(self, source: _T) -> _R:
+    def safe_convert(self, source: _T, context: ConversionContext) -> _R:
         with _identity_map() as identity_map:
             if id(source) not in identity_map:
-                identity_map[id(source)] = self._inner.safe_convert(source)
+                identity_map[id(source)] = self._inner.safe_convert(source, context)
             return identity_map[id(source)]
 
 

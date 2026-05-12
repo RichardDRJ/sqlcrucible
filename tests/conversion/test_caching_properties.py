@@ -12,6 +12,7 @@ from hypothesis import given
 from sqlcrucible.conversion.caching import CachingConverter, _identity_map
 from sqlcrucible.conversion.registry import Converter
 
+from tests.conversion.conftest import ANY_CONTEXT
 from tests.strategies import Source, Target, shared_object_list
 
 
@@ -21,8 +22,8 @@ def _make_doubling_converter() -> tuple[CachingConverter[Source, Target], MagicM
     Returns the caching converter and the mock so callers can inspect calls.
     """
     inner = MagicMock(spec=Converter)
-    inner.convert.side_effect = lambda src: Target(value=src.value * 2)
-    inner.safe_convert.side_effect = lambda src: Target(value=src.value * 2)
+    inner.convert.side_effect = lambda src, ctx: Target(value=src.value * 2)
+    inner.safe_convert.side_effect = lambda src, ctx: Target(value=src.value * 2)
     return CachingConverter(inner), inner
 
 
@@ -32,7 +33,7 @@ def test_same_object_returns_identical_result(data):
     converter, _inner = _make_doubling_converter()
 
     with _identity_map():
-        results = [converter.convert(src) for src in reference_list]
+        results = [converter.convert(src, ANY_CONTEXT) for src in reference_list]
 
     seen: dict[int, Target] = {}
     for src, result in zip(reference_list, results, strict=True):
@@ -49,7 +50,7 @@ def test_inner_converter_called_once_per_unique_object(data):
 
     with _identity_map():
         for src in reference_list:
-            converter.convert(src)
+            converter.convert(src, ANY_CONTEXT)
 
     unique_source_ids = {id(src) for src in reference_list}
     assert inner.convert.call_count == len(unique_source_ids)
@@ -61,7 +62,7 @@ def test_safe_convert_same_identity_invariant(data):
     converter, _inner = _make_doubling_converter()
 
     with _identity_map():
-        results = [converter.safe_convert(src) for src in reference_list]
+        results = [converter.safe_convert(src, ANY_CONTEXT) for src in reference_list]
 
     seen: dict[int, Target] = {}
     for src, result in zip(reference_list, results, strict=True):
@@ -77,13 +78,13 @@ def test_separate_contexts_are_isolated(data):
     converter, inner = _make_doubling_converter()
 
     with _identity_map():
-        first_results = [converter.convert(src) for src in reference_list]
+        first_results = [converter.convert(src, ANY_CONTEXT) for src in reference_list]
 
     inner.reset_mock()
-    inner.convert.side_effect = lambda src: Target(value=src.value * 2)
+    inner.convert.side_effect = lambda src, ctx: Target(value=src.value * 2)
 
     with _identity_map():
-        second_results = [converter.convert(src) for src in reference_list]
+        second_results = [converter.convert(src, ANY_CONTEXT) for src in reference_list]
 
     for first, second in zip(first_results, second_results, strict=True):
         assert first is not second
@@ -98,7 +99,7 @@ def test_conversion_results_are_correct(data):
     converter, _inner = _make_doubling_converter()
 
     with _identity_map():
-        results = [converter.convert(src) for src in reference_list]
+        results = [converter.convert(src, ANY_CONTEXT) for src in reference_list]
 
     for src, result in zip(reference_list, results, strict=True):
         assert result.value == src.value * 2

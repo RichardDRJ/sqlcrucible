@@ -1,4 +1,4 @@
-from tests.conversion.conftest import TargetItem, SourceItem
+from tests.conversion.conftest import ANY_CONTEXT, TargetItem, SourceItem
 
 import pytest
 
@@ -59,5 +59,5 @@ def test_sequence_conversion_produces_correct_type(
 ):
     conv = registry.resolve(source_tp, target_tp)
     assert conv is not None
-    actual_output = conv.convert(input_value)
+    actual_output = conv.convert(input_value, ANY_CONTEXT)
     assert actual_output == expected_output

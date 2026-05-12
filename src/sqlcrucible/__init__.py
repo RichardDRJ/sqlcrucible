@@ -1,3 +1,4 @@
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.entity.core import SQLCrucibleBaseModel, SQLCrucibleEntity, SQLAlchemyParameters
 from sqlcrucible.entity.sa_type import SAType
 from sqlcrucible.entity.annotations import (
@@ -18,6 +19,7 @@ __all__ = [
     "ExcludeSAField",
     "ConvertFromSAWith",
     "ConvertToSAWith",
+    "ConversionContext",
     "readonly_field",
     "ReadonlyFieldDescriptor",
     "__version__",

@@ -16,6 +16,7 @@ from sqlcrucible._types.annotations import (
 from typing import Any, get_origin
 
 
+from sqlcrucible.conversion.context import ConversionContext
 from sqlcrucible.conversion.exceptions import TypeMismatchError
 from sqlcrucible.conversion.registry import Converter, ConverterFactory
 from sqlcrucible.conversion.registry import ConverterRegistry
@@ -39,10 +40,10 @@ class NoOpConverter(Converter[Any, Any]):
     def matches(self, source_tp: Any, target_tp: Any) -> bool:
         return types_are_non_parameterised_and_equal(source_tp, target_tp)
 
-    def convert(self, source: Any) -> Any:
+    def convert(self, source: Any, context: ConversionContext) -> Any:
         return source
 
-    def safe_convert(self, source: Any) -> Any:
+    def safe_convert(self, source: Any, context: ConversionContext) -> Any:
         if not (self._target_origin is Any or isinstance(source, self._target_origin)):
             raise TypeMismatchError(source, self._target_tp)
         return source
