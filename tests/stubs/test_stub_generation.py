@@ -7,12 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from sqlcrucible.stubs import _write_to_stub_file, generate_stubs
-from sqlcrucible.stubs.codegen import ClassDef
-
-
-def _stub_classdef(module: str) -> ClassDef:
-    return ClassDef(source=object, module=module, imports=[], class_def="class Fake: pass")
+from sqlcrucible.stubs import _finalize_stub_package, _stub_path, generate_stubs
 
 
 @pytest.fixture
@@ -20,22 +15,35 @@ def stubs_root(tmp_path: Path) -> Path:
     return tmp_path / "stubs"
 
 
-def test_write_stub_creates_init_pyi_for_nonexistent_package(stubs_root: Path):
-    module_name = "nonexistent.fake.module"
-    _write_to_stub_file([_stub_classdef(module_name)], stubs_root, module_name)
+@pytest.mark.parametrize(
+    ("module_name", "expected"),
+    [
+        ("sqlcrucible.entity.sa_type", "sqlcrucible-stubs/entity/sa_type.pyi"),
+        ("sqlcrucible.generated.myapp.models", "sqlcrucible-stubs/generated/myapp/models.pyi"),
+    ],
+)
+def test_stub_path_targets_stubs_package(stubs_root: Path, module_name: str, expected: str):
+    assert _stub_path(stubs_root, module_name) == stubs_root / expected
 
-    for package in ("nonexistent", "nonexistent/fake"):
-        init_pyi = stubs_root / package / "__init__.pyi"
-        assert init_pyi.exists(), f"Expected {init_pyi} to exist for non-source package"
+
+def test_finalize_flags_package_partial_and_marks_stub_only_dirs(stubs_root: Path):
+    generated = stubs_root / "sqlcrucible-stubs" / "generated"
+    generated.mkdir(parents=True)
+    (generated / "models.pyi").write_text("class Fake: ...")
+
+    _finalize_stub_package(stubs_root)
+
+    assert (stubs_root / "sqlcrucible-stubs" / "py.typed").read_text() == "partial\n"
+    assert (generated / "__init__.pyi").read_text() == ""
 
 
-def test_write_stub_skips_init_pyi_for_source_package(stubs_root: Path):
-    module_name = "sqlcrucible.stubs.fakefile"
-    _write_to_stub_file([_stub_classdef(module_name)], stubs_root, module_name)
+def test_finalize_mirrors_real_package_init_to_avoid_shadowing(stubs_root: Path):
+    (stubs_root / "sqlcrucible-stubs").mkdir(parents=True)
 
-    for package in ("sqlcrucible", "sqlcrucible/stubs"):
-        init_pyi = stubs_root / package / "__init__.pyi"
-        assert not init_pyi.exists(), f"Expected {init_pyi} to NOT exist for source package"
+    _finalize_stub_package(stubs_root)
+
+    init_pyi = (stubs_root / "sqlcrucible-stubs" / "__init__.pyi").read_text()
+    assert "SAType" in init_pyi
 
 
 def test_generate_stubs_no_entities_raises():

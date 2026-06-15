@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -90,7 +91,9 @@ def construct_model_def(sqlalchemy_type: type) -> ClassDef:
     )
 
 
-def specificity_order(entities: list[type[SQLCrucibleEntity]]) -> list[type[SQLCrucibleEntity]]:
+def specificity_order(
+    entities: Sequence[type[SQLCrucibleEntity]],
+) -> list[type[SQLCrucibleEntity]]:
     """Sort entities so subclasses appear before parent classes.
 
     Type checkers match the first applicable overload, so more-specific
@@ -128,7 +131,7 @@ def _is_parameterised_generic(entity: type) -> bool:
     return origin is not None and origin is not entity
 
 
-def construct_sa_type_stub(entities: list[type[SQLCrucibleEntity]]) -> str:
+def construct_sa_type_stub(entities: Sequence[type[SQLCrucibleEntity]]) -> str:
     """Construct a stub for SAType with @overload declarations.
 
     Generates overloads on SATypeMeta.__getitem__ that map each entity

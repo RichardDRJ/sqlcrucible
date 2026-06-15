@@ -27,7 +27,7 @@ from sqlcrucible.entity.field_definitions import (
     canonicalise_typeform,
     SQLCrucibleField,
 )
-from typing_extensions import get_annotations, Format
+from typing_extensions import get_annotations, Format, TypeForm
 
 if TYPE_CHECKING:
     from sqlcrucible.entity.core import SQLCrucibleEntity
@@ -221,40 +221,23 @@ class ReadonlyFieldDescriptor(property, Generic[_T, _O]):
 
 
 @overload
-def readonly_field(tp: type[_T]) -> _T: ...
+def readonly_field(tp: TypeForm[_T]) -> _T: ...
 
 
 @overload
-def readonly_field(tp: type[_T], arg1: SQLAlchemyField | ORMDescriptor[Any], /) -> _T: ...
+def readonly_field(tp: TypeForm[_T], arg1: SQLAlchemyField | ORMDescriptor[Any], /) -> _T: ...
 
 
 @overload
 def readonly_field(
-    tp: type[_T],
+    tp: TypeForm[_T],
     arg1: SQLAlchemyField | ORMDescriptor[Any],
     arg2: SQLAlchemyField | ORMDescriptor[Any],
     /,
 ) -> _T: ...
 
 
-@overload
-def readonly_field(tp: str) -> Any: ...
-
-
-@overload
-def readonly_field(tp: str, arg1: SQLAlchemyField | ORMDescriptor[Any], /) -> Any: ...
-
-
-@overload
-def readonly_field(
-    tp: str,
-    arg1: SQLAlchemyField | ORMDescriptor[Any],
-    arg2: SQLAlchemyField | ORMDescriptor[Any],
-    /,
-) -> Any: ...
-
-
-def readonly_field(tp: type[_T] | str, *args: SQLAlchemyField | ORMDescriptor[Any]) -> Any:
+def readonly_field(tp: TypeForm[_T], *args: SQLAlchemyField | ORMDescriptor[Any]) -> Any:
     """Create a readonly field descriptor.
 
     Readonly fields are loaded from the SQLAlchemy model but cannot be set
@@ -262,7 +245,10 @@ def readonly_field(tp: type[_T] | str, *args: SQLAlchemyField | ORMDescriptor[An
     and association_proxy.
 
     Args:
-        tp: The type of the field value
+        tp: The type of the field value. Any type form is accepted and its
+            value type is preserved in the return type: a bare type (``str``),
+            a parameterized generic (``list[str]``), a union (``int | None``),
+            or a string forward reference (``"list[str]"``).
         *args: Optional SQLAlchemyField and/or ORMDescriptor (e.g., hybrid_property,
             association_proxy) in any order. If both are provided, the descriptor
             is merged into the SQLAlchemyField. If neither is provided, the descriptor
