@@ -44,11 +44,11 @@ test = [
     "pytest-cov>=6.0.0",
     "hypothesis>=6.100.0",
     "pyright",
-    "ty",
+    "ty>=0.0.41",
 ]
 typecheck = [
     "pyright",
-    "ty",
+    "ty>=0.0.41",
 ]
 lint = [
     "ruff",
@@ -68,6 +68,11 @@ dev = [
     { include-group = "lint" },
     { include-group = "depcheck" },
 ]
+
+[tool.pyright]
+# Required for TypeForm support (PEP 747): without this, pyright rejects string
+# forward references and union special forms passed to readonly_field().
+enableExperimentalFeatures = true
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules"

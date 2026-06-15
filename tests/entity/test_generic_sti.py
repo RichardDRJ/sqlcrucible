@@ -149,7 +149,7 @@ def test_stub_generation_is_well_formed(tmp_path: Path):
         assert "Release[" not in source, f"{pyi} references a parameterised generic"
         ast.parse(source, filename=str(pyi))  # SyntaxError on malformed output
 
-    sa_type_pyi = (tmp_path / "sqlcrucible" / "entity" / "sa_type.pyi").read_text()
+    sa_type_pyi = (tmp_path / "sqlcrucible-stubs" / "entity" / "sa_type.pyi").read_text()
     # The concrete subclasses and the (abstract) origin do get overloads.
     assert "tests.entity.generic_sti_models.Single]" in sa_type_pyi
     assert "tests.entity.generic_sti_models.Album]" in sa_type_pyi

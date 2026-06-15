@@ -105,7 +105,17 @@ python -m sqlcrucible.stubs myapp.models --output typings/
 !!! tip
     For projects with entities spread across many modules, create a single module that imports them all, then generate stubs from that.
 
+The output directory contains a PEP 561 `sqlcrucible-stubs` partial stub package. Point your type checker at that directory (not at the package inside it); the checker discovers `sqlcrucible-stubs` and merges it with the installed `sqlcrucible`, overriding `SAType` and adding the generated model types while everything else falls through to the real package.
+
 ### Configuring Type Checkers
+
+=== "ty"
+
+    ```toml
+    # pyproject.toml
+    [tool.ty.environment]
+    extra-paths = ["stubs"]
+    ```
 
 === "Pyright"
 
@@ -123,13 +133,11 @@ python -m sqlcrucible.stubs myapp.models --output typings/
     mypy_path = "stubs"
     ```
 
-=== "ty"
-
-    ```toml
-    # pyproject.toml
-    [tool.ty.environment]
-    extra-paths = ["stubs"]
-    ```
+    !!! note
+        Mypy picks up the typed `sqlcrucible` package but does not currently
+        resolve the generated `SAType[Entity]` model types from the partial
+        stub package, so `SAType[...]` access falls back to `Any` under mypy.
+        Use ty or pyright for full `SAType` column typing.
 
 ### Keeping Stubs Updated
 
