@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from types import UnionType
-from typing import Any, ForwardRef, Union, get_args, get_origin, get_type_hints
+from typing import Any, ForwardRef, Literal, Union, get_args, get_origin, get_type_hints
 
 from typing_extensions import evaluate_forward_ref
 
@@ -75,6 +75,11 @@ def evaluate_forward_refs(tp: Any, owner: type[object]) -> Any:
     args = get_args(tp)
 
     if origin is None:
+        return tp
+
+    # A Literal's arguments are values, not type references - evaluating a
+    # string argument like Literal["a"] would treat "a" as a forward ref.
+    if origin is Literal:
         return tp
 
     evaluated_args = tuple(evaluate_forward_refs(arg, owner) for arg in args)

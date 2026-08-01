@@ -9,7 +9,7 @@ from functools import cached_property
 
 import typing
 from dataclasses import dataclass
-from typing import Annotated, Any, ClassVar, get_args, get_origin, ForwardRef
+from typing import Annotated, Any, ClassVar, Literal, get_args, get_origin, ForwardRef
 
 import sqlalchemy.orm
 from sqlalchemy.orm import ORMDescriptor
@@ -138,8 +138,29 @@ class LazyCanonicalisedTypeform:
 CanonicalisedTypeform = ConcreteCanonicalisedTypeform | LazyCanonicalisedTypeform
 
 
+class UnresolvableForwardRefError(TypeError):
+    """Raised when resolving a forward reference makes no progress.
+
+    Resolution returned a typeform equal to its input, so recursing again would
+    repeat forever. Usually means the referenced name resolves to a value that
+    is itself a string, such as a class attribute shadowing the referenced type.
+    """
+
+    def __init__(self, typeform: Any, owner: Any) -> None:
+        super().__init__(
+            f"Forward reference in {typeform!r} on {getattr(owner, '__name__', owner)!r} "
+            f"resolved to itself; check for a name shadowing the referenced type."
+        )
+        self.typeform = typeform
+        self.owner = owner
+
+
 def _contains_forward_ref(tp: Any) -> bool:
     """Check if any type arguments contain forward references (recursively)."""
+    # A Literal's arguments are values, not type references, so a string
+    # argument like Literal["circle"] must not be read as a forward ref.
+    if get_origin(tp) is Literal:
+        return False
     return isinstance(tp, (str, ForwardRef)) or any(
         _contains_forward_ref(inner) for inner in get_args(tp)
     )
@@ -189,6 +210,8 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
 
             def _resolve_parameterized() -> CanonicalisedTypeform:
                 tp = resolve_forward_refs(typeform, owner)
+                if tp == typeform:
+                    raise UnresolvableForwardRefError(typeform, owner)
                 return canonicalise_typeform(owner, tp)
 
             return LazyCanonicalisedTypeform(supplier=_resolve_parameterized)
