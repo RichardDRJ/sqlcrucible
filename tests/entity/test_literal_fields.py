@@ -20,6 +20,11 @@ class ShapeKind(StrEnum):
     SQUARE = "square"
 
 
+# Narrowing a discriminator to its per-subclass literal is the whole point of these
+# tests, but pyright treats a mutable field's type as invariant, so any narrowing
+# override trips reportIncompatibleVariableOverride. That holds however the base is
+# declared - str, the full Literal union, or the enum - so the rule is suppressed on
+# the two overrides rather than worked around.
 class Shape(BaseTestEntity):
     __sqlalchemy_params__ = {
         "__tablename__": "shape",
@@ -33,14 +38,14 @@ class Shape(BaseTestEntity):
 class Circle(Shape):
     __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "circle"}}
 
-    kind: Annotated[Literal["circle"], ExcludeSAField()] = "circle"
+    kind: Annotated[Literal["circle"], ExcludeSAField()] = "circle"  # pyright: ignore[reportIncompatibleVariableOverride]
     radius: Annotated[int, mapped_column()]
 
 
 class Square(Shape):
     __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "square"}}
 
-    kind: Annotated[Literal[ShapeKind.SQUARE], ExcludeSAField()] = ShapeKind.SQUARE
+    kind: Annotated[Literal[ShapeKind.SQUARE], ExcludeSAField()] = ShapeKind.SQUARE  # pyright: ignore[reportIncompatibleVariableOverride]
     side: Annotated[int, mapped_column()]
 
 

@@ -166,7 +166,9 @@ def _contains_forward_ref(tp: Any) -> bool:
     )
 
 
-def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
+def canonicalise_typeform(
+    owner: Any, typeform: Any, _attempted: frozenset[str] = frozenset()
+) -> CanonicalisedTypeform:
     """Process a type annotation to extract SQLAlchemy mapping information.
 
     Recursively unwraps type annotations to extract the base type,
@@ -181,6 +183,9 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
     Args:
         owner: The class that owns the annotation (for forward ref resolution)
         typeform: The type annotation to process
+        _attempted: Internal. Keys of typeforms already seen while resolving this
+            annotation's forward references, used to detect non-progressing
+            resolution instead of recursing until the stack blows.
 
     Returns:
         A CanonicalisedTypeform containing the extracted base type,
@@ -193,13 +198,13 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
             meta = _extract_annotation_metadata(tuple(annotations))
 
             # Recurse into the inner type to handle nested Annotated/Mapped
-            inner = canonicalise_typeform(owner, tp)
+            inner = canonicalise_typeform(owner, tp, _attempted)
 
             return inner.map(partial(_merge_annotated, meta=meta))
 
         # Mapped[T] - SQLAlchemy's type wrapper, unwrap and recurse
         case sqlalchemy.orm.Mapped, (tp):
-            return canonicalise_typeform(owner, tp)
+            return canonicalise_typeform(owner, tp, _attempted)
 
         # ClassVar - class-level annotation, not an instance field
         case _ if (get_origin(typeform) or typeform) is ClassVar:
@@ -210,9 +215,14 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
 
             def _resolve_parameterized() -> CanonicalisedTypeform:
                 tp = resolve_forward_refs(typeform, owner)
-                if tp == typeform:
+                # Keyed by repr rather than equality: from 3.14 a ForwardRef
+                # carries the owner it was resolved against, and each pass
+                # resolves against a fresh throwaway class, so an unchanged
+                # typeform never compares equal to its input.
+                key = repr(tp)
+                if key in _attempted:
                     raise UnresolvableForwardRefError(typeform, owner)
-                return canonicalise_typeform(owner, tp)
+                return canonicalise_typeform(owner, tp, _attempted | {key})
 
             return LazyCanonicalisedTypeform(supplier=_resolve_parameterized)
 
