@@ -9,7 +9,7 @@ from functools import cached_property
 
 import typing
 from dataclasses import dataclass
-from typing import Annotated, Any, ClassVar, get_args, get_origin, ForwardRef
+from typing import Annotated, Any, ClassVar, Literal, get_args, get_origin, ForwardRef
 
 import sqlalchemy.orm
 from sqlalchemy.orm import ORMDescriptor
@@ -138,14 +138,37 @@ class LazyCanonicalisedTypeform:
 CanonicalisedTypeform = ConcreteCanonicalisedTypeform | LazyCanonicalisedTypeform
 
 
+class UnresolvableForwardRefError(TypeError):
+    """Raised when resolving a forward reference makes no progress.
+
+    Resolution returned a typeform equal to its input, so recursing again would
+    repeat forever. Usually means the referenced name resolves to a value that
+    is itself a string, such as a class attribute shadowing the referenced type.
+    """
+
+    def __init__(self, typeform: Any, owner: Any) -> None:
+        super().__init__(
+            f"Forward reference in {typeform!r} on {getattr(owner, '__name__', owner)!r} "
+            f"resolved to itself; check for a name shadowing the referenced type."
+        )
+        self.typeform = typeform
+        self.owner = owner
+
+
 def _contains_forward_ref(tp: Any) -> bool:
     """Check if any type arguments contain forward references (recursively)."""
+    # A Literal's arguments are values, not type references, so a string
+    # argument like Literal["circle"] must not be read as a forward ref.
+    if get_origin(tp) is Literal:
+        return False
     return isinstance(tp, (str, ForwardRef)) or any(
         _contains_forward_ref(inner) for inner in get_args(tp)
     )
 
 
-def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
+def canonicalise_typeform(
+    owner: Any, typeform: Any, _attempted: frozenset[str] = frozenset()
+) -> CanonicalisedTypeform:
     """Process a type annotation to extract SQLAlchemy mapping information.
 
     Recursively unwraps type annotations to extract the base type,
@@ -160,6 +183,9 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
     Args:
         owner: The class that owns the annotation (for forward ref resolution)
         typeform: The type annotation to process
+        _attempted: Internal. Keys of typeforms already seen while resolving this
+            annotation's forward references, used to detect non-progressing
+            resolution instead of recursing until the stack blows.
 
     Returns:
         A CanonicalisedTypeform containing the extracted base type,
@@ -172,13 +198,13 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
             meta = _extract_annotation_metadata(tuple(annotations))
 
             # Recurse into the inner type to handle nested Annotated/Mapped
-            inner = canonicalise_typeform(owner, tp)
+            inner = canonicalise_typeform(owner, tp, _attempted)
 
             return inner.map(partial(_merge_annotated, meta=meta))
 
         # Mapped[T] - SQLAlchemy's type wrapper, unwrap and recurse
         case sqlalchemy.orm.Mapped, (tp):
-            return canonicalise_typeform(owner, tp)
+            return canonicalise_typeform(owner, tp, _attempted)
 
         # ClassVar - class-level annotation, not an instance field
         case _ if (get_origin(typeform) or typeform) is ClassVar:
@@ -189,7 +215,14 @@ def canonicalise_typeform(owner: Any, typeform: Any) -> CanonicalisedTypeform:
 
             def _resolve_parameterized() -> CanonicalisedTypeform:
                 tp = resolve_forward_refs(typeform, owner)
-                return canonicalise_typeform(owner, tp)
+                # Keyed by repr rather than equality: from 3.14 a ForwardRef
+                # carries the owner it was resolved against, and each pass
+                # resolves against a fresh throwaway class, so an unchanged
+                # typeform never compares equal to its input.
+                key = repr(tp)
+                if key in _attempted:
+                    raise UnresolvableForwardRefError(typeform, owner)
+                return canonicalise_typeform(owner, tp, _attempted | {key})
 
             return LazyCanonicalisedTypeform(supplier=_resolve_parameterized)
 
