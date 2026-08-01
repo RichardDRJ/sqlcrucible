@@ -104,6 +104,41 @@ class Dog(Animal):
 !!! warning
     Concrete table inheritance requires redefining ALL columns in each subclass.
 
+## Narrowing the discriminator
+
+The examples above type the discriminator as `str`, which is the simplest thing that works. The cost shows up when you generate a client from these models: every subclass declares the same discriminator type, so the generated union carries no information about which variant you have.
+
+```ts
+// Every variant says `type: string`, so this does not narrow
+if (animal.type === "dog") {
+  animal.bones_chewed;  // not accessible without a cast
+}
+```
+
+Pin each subclass to its own value instead, using `Literal`:
+
+```python
+from typing import Annotated, Literal
+
+class Dog(Animal):
+    __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "dog"}}
+    bones_chewed: Annotated[int | None, mapped_column(nullable=True)] = None
+    type: Annotated[Literal["dog"], ExcludeSAField()] = "dog"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+class Cat(Animal):
+    __sqlalchemy_params__ = {"__mapper_args__": {"polymorphic_identity": "cat"}}
+    hours_napped: Annotated[int | None, mapped_column(nullable=True)] = None
+    type: Annotated[Literal["cat"], ExcludeSAField()] = "cat"  # pyright: ignore[reportIncompatibleVariableOverride]
+```
+
+`Literal` also accepts enum members, so `Literal[AnimalType.DOG]` works if your discriminator is a `StrEnum`.
+
+!!! warning "Keep `ExcludeSAField()`"
+    The narrowed annotation still redeclares a column that already exists on the parent, so it needs `ExcludeSAField()` exactly as the `str` version did. A bare `Literal["dog"]` fails at import with `Column 'type' on class DogAutoModel conflicts with existing column 'animal.type'`.
+
+!!! note "Pyright reports an override error"
+    Pyright treats a mutable field's type as invariant, so narrowing an inherited field trips `reportIncompatibleVariableOverride`. No base declaration avoids this - `str`, the full `Literal["dog", "cat"]` union, and a `StrEnum` all report it - so suppress the rule per declaration as above, or disable it for your models module. This is a type checker limitation rather than a SQLCrucible one, and `ty` does not report it.
+
 ## Polymorphic Round-Trip
 
 When using inheritance, `from_sa_model()` automatically returns the correct subclass:
